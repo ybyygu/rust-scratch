@@ -1,0 +1,48 @@
+#+TITLE: Rust Learning
+#+SETUPFILE: ~/Notes/common.org
+#+SETUPFILE: ~/Notes/latex.org
+#+SETUPFILE: ~/Notes/coding.org
+
+* Memo
+** [2017-12-10 Sun] 使用cargo来管理rust程序
+: cargo new test1 --bin
+: cargo run test1
+
+* cargo
+#+name: 7935cdce-84b1-4d22-a63d-7d0a8580a279
+#+BEGIN_SRC conf :tangle Cargo.toml
+  [package]
+  name = "test1"
+  version = "0.1.0"
+  authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+  [dependencies]
+
+#+END_SRC
+
+* testing
+#+name: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
+#+begin_src shell :results output
+  cargo run test1
+#+end_src
+
+#+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
+: this is a hello world
+: 12
+
+* src
+:PROPERTIES:
+:header-args: :tangle src/main.rs
+:END:
+#+name: b08803c2-e9b1-4542-9574-b8c467d527b1
+#+BEGIN_SRC rust
+  fn main() {
+      println!("this is a hello {}", "world");
+      println!("{}", 12);
+  }
+#+END_SRC
+
+* Local variables
+# Local Variables:
+# mode: org
+# end:

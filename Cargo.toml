@@ -1,0 +1,8 @@
+# [[file:~/Workspace/Programming/rust-scratch/rust.note::7935cdce-84b1-4d22-a63d-7d0a8580a279][7935cdce-84b1-4d22-a63d-7d0a8580a279]]
+[package]
+name = "test1"
+version = "0.1.0"
+authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+[dependencies]
+# 7935cdce-84b1-4d22-a63d-7d0a8580a279 ends here
