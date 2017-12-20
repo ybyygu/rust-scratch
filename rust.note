@@ -3,10 +3,65 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo
+* Memo [0/1]
+** [2017-12-20 Wed] rust基础练习1
+常量定义:
+: let sum = 0;
+
+变量定义:
+: let mut sum = 0;
+
+上面的sum变量被定义为整型, 可以加和整型数据.
+
+如果sum定义为浮点数:
+: let mut sum = 0.;
+: sum += 1;
+自加和整型数1会报错. 需要对1进行显式的类型转换:
+: sum += 1 as f64;
+或者:
+: sum += 1_f64;
+
+如果是变量必须用"as f64"
+: sum += i as f64;
+
+rust对数值类型要求很严, 整数除以浮点数会报错
+: 12/2.
+
+整数除以整数会得到一个整数:
+: 13/6
+上面的值为2
+
+常见的数值类型: i32, i64, u32, u64, f32, f64
+
+rust避免做任何假设, 这倒是免掉了C里面的不少坑.
+
+常见数值运算: [[https://doc.rust-lang.org/std/primitive.f64.html][docs]]
+: x.abs()
+: x.powf(2.)
+: x.sqrt()
+
+#+name: dac3cc9f-d575-49e3-a759-49a1f88224e8
+#+BEGIN_SRC rust
+  for i in 0..5 {
+      println!("loop {}", i);
+  }
+#+END_SRC
+
+loop变量不需要显式定义.
+
+自定义函数:
+#+BEGIN_EXAMPLE
+fn sqrt(x: f64) -> f64 {
+  return x*x;
+}
+#+END_EXAMPLE
+函数返回值以最后一个语句为准, 因此return可以略去(同时去掉最后的分号).
+
+** TODO [2017-12-12 Tue] 使用rust实现之前写的files-coder
 ** [2017-12-10 Sun] 使用cargo来管理rust程序
 : cargo new test1 --bin
 : cargo run test1
+
 
 * cargo
 #+name: 7935cdce-84b1-4d22-a63d-7d0a8580a279
@@ -17,6 +72,7 @@
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
   [dependencies]
+  base64 = "0.8.0"
 
 #+END_SRC
 
@@ -27,20 +83,54 @@
 #+end_src
 
 #+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
-: this is a hello world
-: 12
+#+begin_example
+[104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100]
+this is a hello world
+12
+loop: 0, sum = 0
+loop: 1, sum = 1
+loop: 2, sum = 3
+loop: 3, sum = 6
+loop: 4, sum = 10
+good
+3.1622776601683795
+#+end_example
 
 * src
 :PROPERTIES:
 :header-args: :tangle src/main.rs
 :END:
+
 #+name: b08803c2-e9b1-4542-9574-b8c467d527b1
 #+BEGIN_SRC rust
+  extern crate base64;
+
+  fn sqrt(x: f64) -> f64 {
+      println!("good", );
+      x.sqrt()
+  }
+
   fn main() {
+      let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
+      println!("{:?}", bytes);
+
       println!("this is a hello {}", "world");
       println!("{}", 12);
+
+      let mut sum = 0.;
+      for i in 0..5 {
+          sum += i as f64;
+          println!("loop: {}, sum = {}", i, sum);
+      }
+
+      let mut v = sqrt(sum);
+      println!("{}", v);
   }
 #+END_SRC
+* References
+- [[http://stevedonovan.github.io/rust-gentle-intro/readme.html][Introduction - A Gentle Introduction to Rust]]
+- [[https://rustbyexample.com/][Introduction - Rust By Example]]
+- [[https://learnxinyminutes.com/docs/rust/][Learn rust in Y Minutes]]
 
 * Local variables
 # Local Variables:

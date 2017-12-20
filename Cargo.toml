@@ -5,4 +5,5 @@ version = "0.1.0"
 authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
 [dependencies]
+base64 = "0.8.0"
 # 7935cdce-84b1-4d22-a63d-7d0a8580a279 ends here
