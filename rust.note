@@ -4,6 +4,32 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/1]
+** [2017-12-21 Thu] rust基础练习2 control flow
+#+name: 5fde93b8-94a6-4341-9db8-f3625238dfc5
+#+BEGIN_SRC rust
+  if (a < b) {
+      println!("{}", 1);
+  } else {
+      println!("{}", 2);
+  }
+#+END_SRC
+
+如果是多个条件:
+: else if
+
+也可以像python写成单行表达式
+#+name: 632a594b-c4a8-48db-ab4d-f176d44954b2
+#+BEGIN_SRC rust
+  let y:f64 = if a < 4. {1.} else {2.}
+#+END_SRC
+此时要注意, else前后的返回值类型要一致, 否则会报错.
+
+循环结构可以用loop, while, for. break/continue同样可用.
+
+对于多层循环, rust中可以使用标签, 然后break到指定位置. 见[[https://rustbyexample.com/flow_control/loop/nested.html][doc]].
+
+rust使用match来实现像C里的switch语句类似的功能.
+
 ** [2017-12-20 Wed] rust基础练习1
 常量定义:
 : let sum = 0;
@@ -83,18 +109,16 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
-#+begin_example
-[104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100]
-this is a hello world
-12
-loop: 0, sum = 0
-loop: 1, sum = 1
-loop: 2, sum = 3
-loop: 3, sum = 6
-loop: 4, sum = 10
-good
-3.1622776601683795
-#+end_example
+: [104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100]
+: this is a hello world
+: 12
+: loop: 0, sum = 0
+: loop: 1, sum = 1
+: loop: 2, sum = 3
+: loop: 3, sum = 6
+: loop: 4, sum = 10
+: 4
+
 
 * src
 :PROPERTIES:
@@ -106,8 +130,14 @@ good
   extern crate base64;
 
   fn sqrt(x: f64) -> f64 {
-      println!("good", );
-      x.sqrt()
+      let mut y:f64 = if x < 5. {5.} else {10.};
+      loop {
+          y += 1.;
+          if y > 15. {
+              break;
+          }
+      }
+      y.sqrt()
   }
 
   fn main() {
@@ -127,6 +157,7 @@ good
       println!("{}", v);
   }
 #+END_SRC
+
 * References
 - [[http://stevedonovan.github.io/rust-gentle-intro/readme.html][Introduction - A Gentle Introduction to Rust]]
 - [[https://rustbyexample.com/][Introduction - Rust By Example]]

@@ -2,8 +2,14 @@
 extern crate base64;
 
 fn sqrt(x: f64) -> f64 {
-    println!("good", );
-    x.sqrt()
+    let mut y:f64 = if x < 5. {5.} else {10.};
+    loop {
+        y += 1.;
+        if y > 15. {
+            break;
+        }
+    }
+    y.sqrt()
 }
 
 fn main() {
