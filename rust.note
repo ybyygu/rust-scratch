@@ -4,6 +4,87 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/1]
+** [2017-12-21 Thu] rust基础练习3 基本数据结构
+*** arrays, slices
+: arrays like [1, 2, 3]
+rust中的array和C里的静态数组类似, 成员类型要一致, 运行时不可增删.
+#+name: 263760d4-6182-4794-8e27-704b2aa61a31
+#+begin_src rust
+  let arr = [1, 2, 5, 9, 10];
+  println!("{}", arr[0], array[2]);
+#+end_src
+如何访问数组成员越界, rust在编译时就会报错.
+
+成员数:
+: arr.len()
+
+数组声明时, 要指明成员数值类型及成员数:
+: let arr: [i32; 5] = [1, 2, 3, 4, 6];
+注意中间用的是分号.
+: let arr: [i32; 500] = [12; 500];
+注意右侧的值为500个12.
+
+如果要使用range来提取多个数值, 需要取址, 用slice:
+: &arr[1..5]
+
+二维数组:
+#+name: ec1673bf-357a-475c-bb95-ff63fe463bc2
+#+begin_src rust
+  let arr = [[1, 5], [2, 4]];
+  println!("{:?}", arr[0][1]);
+#+end_src
+
+slice在运行期才能知道数组的大小, 为了避免panic, 可以用slice.get方法
+#+name: f9bd3ee7-0cce-4adc-a0da-cf3a440101b4
+#+begin_src rust
+  let arr = [1, 2, 3, 4];
+  let slice = &arr;
+  let last = slice.get(5);
+#+end_src
+这与python中的dict.get类似. slice访问如果越界, 会返回一个特殊的数据结构Option,
+值为None.
+
+Option对象可用函数:
+: last.is_some();
+: last.is_none();
+如果opt有值, 可以提出来:
+: last.unwrap();
+如果opt是None, unwrap的话运行时会panic.
+
+更便捷的方式是使用unwrap_or
+: last.unwrap_or(&-1)
+注意参数用&取址.
+
+注意last.unwrap()取出的数据为reference, 不是实在的数据. 记得根据需求解引:
+: *last.unwrap()
+
+*** tuple
+: tuples like (1, true)
+- tuple中的数据可以是不同类型的.
+- 通过tuple, 函数可以返回多个数值.
+
+tuple输出时:
+: println("{:?}", (1, 2));
+
+tuple可以通过位置来指认:
+#+name: 7db31524-8474-431d-8e3c-279dd552c4e3
+#+begin_src rust
+  let t = (1, 2);
+
+  print!("{}, {}", t.0, t.1);
+#+end_src
+
+可以像python一样, 可以把tuple展开给多个变量:
+#+name: efd8cd2d-26a7-47da-a4ab-841a2f6a1396
+#+begin_src rust
+  let t = (1, 2, 3);
+  let (a, b, c) = t;
+#+end_src
+注意左侧的变量要用tuple的形式括起来, 否则会报错. 这也python不同.
+*** string, char
+*** TODO structs
+这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
+
 ** [2017-12-21 Thu] rust基础练习2 control flow
 #+name: 5fde93b8-94a6-4341-9db8-f3625238dfc5
 #+BEGIN_SRC rust
@@ -30,7 +111,7 @@
 
 rust使用match来实现像C里的switch语句类似的功能.
 
-** [2017-12-20 Wed] rust基础练习1
+** [2017-12-20 Wed] rust基础练习1 变量常量类型
 常量定义:
 : let sum = 0;
 
@@ -109,15 +190,18 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
-: [104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100]
-: this is a hello world
-: 12
-: loop: 0, sum = 0
-: loop: 1, sum = 1
-: loop: 2, sum = 3
-: loop: 3, sum = 6
-: loop: 4, sum = 10
-: 4
+#+begin_example
+this is a hello world
+12
+loop: 0, sum = 0
+loop: 1, sum = 1
+loop: 2, sum = 3
+loop: 3, sum = 6
+loop: 4, sum = 10
+4
+last = 4
+4
+#+end_example
 
 
 * src
@@ -127,7 +211,7 @@ fn sqrt(x: f64) -> f64 {
 
 #+name: b08803c2-e9b1-4542-9574-b8c467d527b1
 #+BEGIN_SRC rust
-  extern crate base64;
+  // extern crate base64;
 
   fn sqrt(x: f64) -> f64 {
       let mut y:f64 = if x < 5. {5.} else {10.};
@@ -140,9 +224,37 @@ fn sqrt(x: f64) -> f64 {
       y.sqrt()
   }
 
+  fn test_tuple() -> (i32, i32){
+      let t = (1, 2);
+      let (a, b) = t;
+      print!("{}, {}\n", a, b);
+      t
+  }
+
+  fn test_array() {
+      let arr: [f64; 100] = [0.1; 100];
+      println!("{:?}, {}", arr[10], arr.len());
+
+      let arr = [[1, 5], [2, 4]];
+      println!("{:?}", arr[0][1]);
+  }
+
+  fn test_slice() -> i32 {
+      let arr = [1, 2, 3, 4];
+      let slice = &arr;
+      let last = slice.get(3);
+      println!("last = {}", last.unwrap());
+      // println!("last = {}", arr[5]);
+      ,*last.unwrap()
+  }
+
+  fn test_structs () {
+      ;
+  }
+
   fn main() {
-      let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
-      println!("{:?}", bytes);
+      // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
+      // println!("{:?}", bytes);
 
       println!("this is a hello {}", "world");
       println!("{}", 12);
@@ -155,6 +267,8 @@ fn sqrt(x: f64) -> f64 {
 
       let mut v = sqrt(sum);
       println!("{}", v);
+      let v = test_slice();
+      print!("{}", v);
   }
 #+END_SRC
 
