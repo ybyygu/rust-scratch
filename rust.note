@@ -5,6 +5,44 @@
 
 * Memo [0/1]
 ** [2017-12-21 Thu] rust基础练习3 基本数据结构
+*** tuple
+: tuples like (1, true)
+- tuple中的数据可以是不同类型的.
+- 通过tuple, 函数可以返回多个数值.
+
+tuple输出时:
+: println("{:?}", (1, 2));
+
+tuple可以通过位置来指认:
+#+name: 7db31524-8474-431d-8e3c-279dd552c4e3
+#+begin_src rust
+  let t = (1, 2);
+
+  print!("{}, {}", t.0, t.1);
+#+end_src
+
+可以像python一样, 可以把tuple展开给多个变量:
+#+name: efd8cd2d-26a7-47da-a4ab-841a2f6a1396
+#+begin_src rust
+  let t = (1, 2, 3);
+  let (a, b, c) = t;
+#+end_src
+注意左侧的变量要用tuple的形式括起来, 否则会报错. 这也python不同.
+
+注意tuple引用内部成员时不能使用变量, 也不能像python的那样来取值. 下面的语句是错的:
+: let t = (12, 2, 'a');
+: let i = 1;
+: println! ("{}", t.i);  // 错误
+: println! ("{}", t[0]); // 错误
+
+只有一个成员的tuple, 后面的逗号不能省略:
+: let t = (12,);
+
+无成员类型:
+: let t = ();
+
+函数无返回值时, 默认返回(), 相当于python中的None?
+
 *** arrays, slices
 : arrays like [1, 2, 3]
 rust中的array和C里的静态数组类似, 成员类型要一致, 运行时不可增删.
@@ -15,8 +53,9 @@ rust中的array和C里的静态数组类似, 成员类型要一致, 运行时不
 #+end_src
 如何访问数组成员越界, rust在编译时就会报错.
 
-成员数:
-: arr.len()
+成员函数:
+: arr.len();
+: arr.sort();
 
 数组声明时, 要指明成员数值类型及成员数:
 : let arr: [i32; 5] = [1, 2, 3, 4, 6];
@@ -57,30 +96,29 @@ Option对象可用函数:
 
 注意last.unwrap()取出的数据为reference, 不是实在的数据. 记得根据需求解引:
 : *last.unwrap()
+*** vector
+vector是动态数组, 同array一样, 成员类型要一致.
 
-*** tuple
-: tuples like (1, true)
-- tuple中的数据可以是不同类型的.
-- 通过tuple, 函数可以返回多个数值.
+声明变量:
+: let v = vec![2, 3, 1, 5];
+或者:
+: let v = Vec::new();
+: v.push(2);
+: ...
 
-tuple输出时:
-: println("{:?}", (1, 2));
+可以从iterator初始化:
+: let v:Vec<i32> = (0..5).collect();
+注意v要指明类型.
 
-tuple可以通过位置来指认:
-#+name: 7db31524-8474-431d-8e3c-279dd552c4e3
-#+begin_src rust
-  let t = (1, 2);
+添加元素:
+: v.push(1);
 
-  print!("{}, {}", t.0, t.1);
-#+end_src
+插入元素:
+: v.insert(1, 'a');
 
-可以像python一样, 可以把tuple展开给多个变量:
-#+name: efd8cd2d-26a7-47da-a4ab-841a2f6a1396
-#+begin_src rust
-  let t = (1, 2, 3);
-  let (a, b, c) = t;
-#+end_src
-注意左侧的变量要用tuple的形式括起来, 否则会报错. 这也python不同.
+删除元素:
+: v.remove(1);
+
 *** string, char
 *** TODO structs
 这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
@@ -97,6 +135,13 @@ tuple可以通过位置来指认:
 
 如果是多个条件:
 : else if
+
+注意if等判断语句后跟bool类型. rust不会像python做隐式类型转换. 比如下面的语句会报错:
+#+name: be800e54-711b-4393-aefb-811c41ba2b7a
+#+begin_src rust
+  let r = 1;
+  if r {...};
+#+end_src
 
 也可以像python写成单行表达式
 #+name: 632a594b-c4a8-48db-ab4d-f176d44954b2
@@ -141,6 +186,7 @@ rust对数值类型要求很严, 整数除以浮点数会报错
 常见的数值类型: i32, i64, u32, u64, f32, f64
 
 rust避免做任何假设, 这倒是免掉了C里面的不少坑.
+
 
 常见数值运算: [[https://doc.rust-lang.org/std/primitive.f64.html][docs]]
 : x.abs()
@@ -190,18 +236,15 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
-#+begin_example
-this is a hello world
-12
-loop: 0, sum = 0
-loop: 1, sum = 1
-loop: 2, sum = 3
-loop: 3, sum = 6
-loop: 4, sum = 10
-4
-last = 4
-4
-#+end_example
+: this is a hello world
+: 12
+: loop: 0, sum = 0
+: loop: 1, sum = 1
+: loop: 2, sum = 3
+: loop: 3, sum = 6
+: loop: 4, sum = 10
+: 4
+: [0, 1, 2, 3, 4]
 
 
 * src
@@ -227,7 +270,7 @@ last = 4
   fn test_tuple() -> (i32, i32){
       let t = (1, 2);
       let (a, b) = t;
-      print!("{}, {}\n", a, b);
+      let i = 1;
       t
   }
 
@@ -235,8 +278,18 @@ last = 4
       let arr: [f64; 100] = [0.1; 100];
       println!("{:?}, {}", arr[10], arr.len());
 
-      let arr = [[1, 5], [2, 4]];
-      println!("{:?}", arr[0][1]);
+      let mut arr = [1, 5, 3, 2];
+      arr.sort();
+      println!("{:?}", arr);
+  }
+
+  fn test_vector() {
+      let mut v = vec![1, 2, 0, 5];
+      v.insert(0, 13);
+      assert_eq!(v, [13, 1, 2, 0, 5]);
+      assert_eq!(v[0], 13);
+      let v:Vec<i32> = (0..5).collect();
+      println!("{:?}", v);
   }
 
   fn test_slice() -> i32 {
@@ -267,8 +320,7 @@ last = 4
 
       let mut v = sqrt(sum);
       println!("{}", v);
-      let v = test_slice();
-      print!("{}", v);
+      test_vector();
   }
 #+END_SRC
 

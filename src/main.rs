@@ -15,7 +15,7 @@ fn sqrt(x: f64) -> f64 {
 fn test_tuple() -> (i32, i32){
     let t = (1, 2);
     let (a, b) = t;
-    print!("{}, {}\n", a, b);
+    let i = 1;
     t
 }
 
@@ -23,8 +23,18 @@ fn test_array() {
     let arr: [f64; 100] = [0.1; 100];
     println!("{:?}, {}", arr[10], arr.len());
 
-    let arr = [[1, 5], [2, 4]];
-    println!("{:?}", arr[0][1]);
+    let mut arr = [1, 5, 3, 2];
+    arr.sort();
+    println!("{:?}", arr);
+}
+
+fn test_vector() {
+    let mut v = vec![1, 2, 0, 5];
+    v.insert(0, 13);
+    assert_eq!(v, [13, 1, 2, 0, 5]);
+    assert_eq!(v[0], 13);
+    let v:Vec<i32> = (0..5).collect();
+    println!("{:?}", v);
 }
 
 fn test_slice() -> i32 {
@@ -55,7 +65,6 @@ fn main() {
 
     let mut v = sqrt(sum);
     println!("{}", v);
-    let v = test_slice();
-    print!("{}", v);
+    test_vector();
 }
 // b08803c2-e9b1-4542-9574-b8c467d527b1 ends here
