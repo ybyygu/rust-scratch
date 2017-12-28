@@ -4,7 +4,7 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/1]
-** [2017-12-21 Thu] rust基础练习3 基本数据结构
+** [2017-12-26 Tue] rust基础练习3 基本数据结构
 *** tuple
 : tuples like (1, true)
 - tuple中的数据可以是不同类型的.
@@ -119,7 +119,60 @@ vector是动态数组, 同array一样, 成员类型要一致.
 删除元素:
 : v.remove(1);
 
-*** string, char
+*** string
+双引号中的为literal string. 中间可以包括硬回车或转义字符.
+#+name: c0f6ce7f-deac-4321-9c14-4312a9518957
+#+begin_src rust
+  let s = "good to go\n";
+
+  let s = "good
+  to go";
+
+  // s = good togo
+  let s = "good to\
+           go";
+#+end_src
+字串中可以使用~\~来续行.
+
+raw string:
+#+name: 3de9f418-5b32-42b6-bf5c-6285b458ad7c
+#+begin_src rust
+  // s = "\n\n"
+  let s = r"\n\n";
+#+end_src
+
+使用format! macro来生成格式化字符串.
+#+name: 21f9c2a1-d351-468e-a414-c37f018903df
+#+begin_src rust
+  let s = format!("{}", 2.2);
+#+end_src
+
+String可用的函数:
+: s.len();
+与python不同, rust中的string不能index, 比如s[0], 但可以slice:
+#+name: 7a55e292-1387-4cdc-8f05-14e9ed00c888
+#+begin_src rust
+  let s = "abcdef";
+  let subs = &s[1..2]
+#+end_src
+
+合并字串
+#+name: 425fe069-3e10-417a-8929-2551b7417db2
+#+begin_src rust
+  let bits = vec!["a", "b", "c"];
+  let s = bits.concat();
+#+end_src
+
+像python中的str.join
+#+name: f91f9154-1da8-4788-a969-dc72a2e281c1
+#+begin_src rust
+  let bits = vec!["a", "b", "c"];
+  let s = bits.join("\n");
+#+end_src
+
+其它:
+contains, replace, trim, split
+
 *** TODO structs
 这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
 
@@ -236,15 +289,19 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
-: this is a hello world
-: 12
-: loop: 0, sum = 0
-: loop: 1, sum = 1
-: loop: 2, sum = 3
-: loop: 3, sum = 6
-: loop: 4, sum = 10
-: 4
-: [0, 1, 2, 3, 4]
+#+begin_example
+this is a hello world
+12
+loop: 0, sum = 0
+loop: 1, sum = 1
+loop: 2, sum = 3
+loop: 3, sum = 6
+loop: 4, sum = 10
+4
+a
+b
+c
+#+end_example
 
 
 * src
@@ -301,8 +358,11 @@ fn sqrt(x: f64) -> f64 {
       ,*last.unwrap()
   }
 
-  fn test_structs () {
-      ;
+  fn test_string () {
+      let s = "good to go to do";
+      let bits = vec!["a", "b", "c"];
+      let s = bits.join("\n");
+      println!("{}", s);
   }
 
   fn main() {
@@ -320,11 +380,12 @@ fn sqrt(x: f64) -> f64 {
 
       let mut v = sqrt(sum);
       println!("{}", v);
-      test_vector();
+      test_string();
   }
 #+END_SRC
 
 * References
+- Programming rust
 - [[http://stevedonovan.github.io/rust-gentle-intro/readme.html][Introduction - A Gentle Introduction to Rust]]
 - [[https://rustbyexample.com/][Introduction - Rust By Example]]
 - [[https://learnxinyminutes.com/docs/rust/][Learn rust in Y Minutes]]

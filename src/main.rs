@@ -46,8 +46,11 @@ fn test_slice() -> i32 {
     *last.unwrap()
 }
 
-fn test_structs () {
-    ;
+fn test_string () {
+    let s = "good to go to do";
+    let bits = vec!["a", "b", "c"];
+    let s = bits.join("\n");
+    println!("{}", s);
 }
 
 fn main() {
@@ -65,6 +68,6 @@ fn main() {
 
     let mut v = sqrt(sum);
     println!("{}", v);
-    test_vector();
+    test_string();
 }
 // b08803c2-e9b1-4542-9574-b8c467d527b1 ends here
