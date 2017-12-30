@@ -1,9 +1,11 @@
-#+TITLE: Rust Learning
+#+TITLE: Learn Rust
 #+SETUPFILE: ~/Notes/common.org
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [0/1]
+* Memo [0/3]
+** TODO [2017-12-30 Sat] 完成[[http://exercism.io/languages/rust/exercises][exercism.io]]上的练习
+** TODO [2017-12-30 Sat] 使用rust来完成之前写的lindermann指数计算程序
 ** [2017-12-26 Tue] rust基础练习3 基本数据结构
 *** tuple
 : tuples like (1, true)
@@ -282,29 +284,53 @@ fn sqrt(x: f64) -> f64 {
 
 #+END_SRC
 
-* testing
-#+name: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
+* tests
+** reverse string
+*** test
+#+name: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
 #+begin_src shell :results output
-  cargo run test1
+  cd exercism/rust/reverse*
+  cargo test
 #+end_src
 
-#+RESULTS: 5df7e3f4-601d-4ed0-bc7c-c8f1ab49520f
+#+RESULTS: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
 #+begin_example
-this is a hello world
-12
-loop: 0, sum = 0
-loop: 1, sum = 1
-loop: 2, sum = 3
-loop: 3, sum = 6
-loop: 4, sum = 10
-4
-a
-b
-c
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 5 tests
+test test_a_capitalized_word ... ignored
+test test_a_palindrome ... ignored
+test test_a_sentence_with_punctuation ... ignored
+test test_a_word ... ignored
+test test_empty_string ... ok
+
+test result: ok. 1 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
 #+end_example
 
+*** src
+:PROPERTIES:
+:header-args: :tangle exercism/rust/reverse-string/src/lib.rs
+:END:
+
+#+name: 3d017385-a2ca-49af-8494-9b2dd4569f24
+#+begin_src rust
+  pub fn reverse(s: &str) -> String {
+      s.chars().rev().collect::<String>()
+  }
+#+end_src
 
 * src
+** main
 :PROPERTIES:
 :header-args: :tangle src/main.rs
 :END:
