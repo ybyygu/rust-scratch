@@ -1,9 +1,20 @@
-#+TITLE: Learn Rust
+#+TITLE: Learn Rust: hack without fear!
 #+SETUPFILE: ~/Notes/common.org
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/3]
+** [2018-01-01 Mon] rust ownership :ATTACH:
+:PROPERTIES:
+:ID:       dfcf2ff4-7214-483f-8b66-bf76a0372e8a
+:Attachments: rust-intro-2018-01-01142409_2018-01-01_14-26-11.png
+:END:
+
+#+DOWNLOADED: @ 2018-01-01 14:26:11
+#+attr_org: :width 600
+#+attr_odt: :width 8
+[[file:data/df/cf2ff4-7214-483f-8b66-bf76a0372e8a/rust-intro-2018-01-01142409_2018-01-01_14-26-11.png]]
+
 ** TODO [2017-12-30 Sat] 完成[[http://exercism.io/languages/rust/exercises][exercism.io]]上的练习
 ** TODO [2017-12-30 Sat] 使用rust来完成之前写的lindermann指数计算程序
 ** [2017-12-26 Tue] rust基础练习3 基本数据结构
@@ -127,7 +138,7 @@ vector是动态数组, 同array一样, 成员类型要一致.
 双引号: literal string
 
 **** string literal
-双引号中的为literal string (type `&str`). 中间可以包括硬回车或转义字符.
+双引号中的为literal string. 中间可以包括硬回车或转义字符.
 #+name: c0f6ce7f-deac-4321-9c14-4312a9518957
 #+begin_src rust
   let s = "good to go\n";
@@ -213,6 +224,9 @@ string.split, string.trim, string.repeat
 
 iteration
 string.chars
+
+&string: shared reference to string
+&str: string slice
 
 *** TODO structs
 这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
@@ -345,23 +359,66 @@ x='好', s="good to go to do"
 Chars { iter: Iter([121, 204, 134]) }
 #+end_example
 
-** TODO hamming distance
+** hamming distance
 *** test
 #+name: 18144448-0970-4f66-bbd3-f206635ba2cf
 #+begin_src shell :results output
   cd exercism/rust/hamming
-  cargo test
+  cargo test -- --nocapture
 #+end_src
+
+#+RESULTS: 18144448-0970-4f66-bbd3-f206635ba2cf
+#+begin_example
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 7 tests
+test test_first_string_is_longer ... ok
+test test_complete_hamming_distance_in_small_strand ... ok
+test test_larger_distance ... ok
+test test_no_difference_between_empty_strands ... ok
+test test_no_difference_between_identical_strands ... ok
+test test_second_string_is_longer ... ok
+test test_small_hamming_distance_in_the_middle_somewhere ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+#+end_example
 
 *** src
 :PROPERTIES:
 :header-args: :tangle exercism/rust/hamming/src/lib.rs
 :END:
 
-#+name: 4b4960c7-208e-48c0-9311-101e003f80c0
+#+name: 86e0273f-d292-4c9a-a644-a82b07625639
 #+begin_src rust
-  pub fn reverse(s: &str) -> String {
-      s.chars().rev().collect::<String>()
+  pub fn hamming_distance(s1: &str, s2: &str) -> Result <usize, String> {
+      if s1.len() != s2.len() {
+          return Err("err".to_string())
+      } else {
+          let l = get_hamming_distance(s1, s2);
+          Ok(l)
+      }
+  }
+
+  fn get_hamming_distance(s1: &str, s2: &str) -> usize {
+      assert_eq!(s1.len(), s2.len());
+
+      let mut sum = 0;
+      for (c1, c2) in s1.chars().zip(s2.chars()) {
+          if c1 != c2 {
+              sum += 1;
+          }
+      }
+      sum
   }
 #+end_src
 
