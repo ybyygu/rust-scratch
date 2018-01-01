@@ -47,10 +47,12 @@ fn test_slice() -> i32 {
 }
 
 fn test_string () {
-    let s = "good to go to do";
-    let bits = vec!["a", "b", "c"];
-    let s = bits.join("\n");
-    println!("{}", s);
+    let mut s = "good to go to do".to_string();
+    s.push('好');
+    let x = s.pop();
+    println!("x={:?}, s={:?}", x.unwrap(), s);
+    println!("{}", "y̆".len());
+    println!("{:?}", "y̆".chars());
 }
 
 fn main() {

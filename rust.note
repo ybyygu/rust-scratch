@@ -122,7 +122,12 @@ vector是动态数组, 同array一样, 成员类型要一致.
 : v.remove(1);
 
 *** string
-双引号中的为literal string. 中间可以包括硬回车或转义字符.
+**** char
+单引号: char
+双引号: literal string
+
+**** string literal
+双引号中的为literal string (type `&str`). 中间可以包括硬回车或转义字符.
 #+name: c0f6ce7f-deac-4321-9c14-4312a9518957
 #+begin_src rust
   let s = "good to go\n";
@@ -174,6 +179,40 @@ String可用的函数:
 
 其它:
 contains, replace, trim, split
+**** String
+[[https://doc.rust-lang.org/std/string/struct.String.html][std::string::String - Rust]]
+
+A UTF-8 encoded, growable string
+
+初始化:
+: let s = String::new();
+: let s = String::from("world");
+: let s = "Hello".to_string();
+
+修改字串:
+string.push, string.push_str, string.pop, string.remove, string.insert, string.insert_str, string.truncate, string.clear
+: s.push('1');
+: s.push('好');
+: s.push_str("bar");
+
+
+可以像python一样, 使用"+"来合并字串:
+#+name: 9e15f850-01c6-4368-b21e-fe560b347feb
+#+begin_src rust
+  let mut s = "good to go to do".to_string();
+  s.push('d');
+  println!("{}", s + "good");
+#+end_src
+
+测试:
+string.contains, string.starts_with, string.ends_with, string.find
+
+其它:
+string.split, string.trim, string.repeat
+: assert_eq!("abc".repeat(4), String::from("abcabcabcabc"));
+
+iteration
+string.chars
 
 *** TODO structs
 这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
@@ -284,7 +323,48 @@ fn sqrt(x: f64) -> f64 {
 
 #+END_SRC
 
-* tests
+* tests [0/1]
+** scratch
+#+name: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
+#+begin_src shell :results output
+  cargo run test1
+#+end_src
+
+#+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
+#+begin_example
+this is a hello world
+12
+loop: 0, sum = 0
+loop: 1, sum = 1
+loop: 2, sum = 3
+loop: 3, sum = 6
+loop: 4, sum = 10
+4
+x='好', s="good to go to do"
+3
+Chars { iter: Iter([121, 204, 134]) }
+#+end_example
+
+** TODO hamming distance
+*** test
+#+name: 18144448-0970-4f66-bbd3-f206635ba2cf
+#+begin_src shell :results output
+  cd exercism/rust/hamming
+  cargo test
+#+end_src
+
+*** src
+:PROPERTIES:
+:header-args: :tangle exercism/rust/hamming/src/lib.rs
+:END:
+
+#+name: 4b4960c7-208e-48c0-9311-101e003f80c0
+#+begin_src rust
+  pub fn reverse(s: &str) -> String {
+      s.chars().rev().collect::<String>()
+  }
+#+end_src
+
 ** reverse string
 *** test
 #+name: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
@@ -385,10 +465,12 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   }
 
   fn test_string () {
-      let s = "good to go to do";
-      let bits = vec!["a", "b", "c"];
-      let s = bits.join("\n");
-      println!("{}", s);
+      let mut s = "good to go to do".to_string();
+      s.push('好');
+      let x = s.pop();
+      println!("x={:?}, s={:?}", x.unwrap(), s);
+      println!("{}", "y̆".len());
+      println!("{:?}", "y̆".chars());
   }
 
   fn main() {
