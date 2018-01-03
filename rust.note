@@ -138,7 +138,9 @@ vector是动态数组, 同array一样, 成员类型要一致.
 双引号: literal string
 
 **** string literal
-双引号中的为literal string. 中间可以包括硬回车或转义字符.
+双引号中的为literal string (&'static str). literal string为静态数据类型, 就像是整型, 浮点型.
+
+中间可以包括硬回车或转义字符.
 #+name: c0f6ce7f-deac-4321-9c14-4312a9518957
 #+begin_src rust
   let s = "good to go\n";
@@ -159,13 +161,7 @@ raw string:
   let s = r"\n\n";
 #+end_src
 
-使用format! macro来生成格式化字符串.
-#+name: 21f9c2a1-d351-468e-a414-c37f018903df
-#+begin_src rust
-  let s = format!("{}", 2.2);
-#+end_src
-
-String可用的函数:
+lieral string可用的函数:
 : s.len();
 与python不同, rust中的string不能index, 比如s[0], 但可以slice:
 #+name: 7a55e292-1387-4cdc-8f05-14e9ed00c888
@@ -174,22 +170,6 @@ String可用的函数:
   let subs = &s[1..2]
 #+end_src
 
-合并字串
-#+name: 425fe069-3e10-417a-8929-2551b7417db2
-#+begin_src rust
-  let bits = vec!["a", "b", "c"];
-  let s = bits.concat();
-#+end_src
-
-像python中的str.join
-#+name: f91f9154-1da8-4788-a969-dc72a2e281c1
-#+begin_src rust
-  let bits = vec!["a", "b", "c"];
-  let s = bits.join("\n");
-#+end_src
-
-其它:
-contains, replace, trim, split
 **** String
 [[https://doc.rust-lang.org/std/string/struct.String.html][std::string::String - Rust]]
 
@@ -206,7 +186,6 @@ string.push, string.push_str, string.pop, string.remove, string.insert, string.i
 : s.push('好');
 : s.push_str("bar");
 
-
 可以像python一样, 使用"+"来合并字串:
 #+name: 9e15f850-01c6-4368-b21e-fe560b347feb
 #+begin_src rust
@@ -214,6 +193,32 @@ string.push, string.push_str, string.pop, string.remove, string.insert, string.i
   s.push('d');
   println!("{}", s + "good");
 #+end_src
+
+使用format! macro来生成格式化字符串.
+#+name: 21f9c2a1-d351-468e-a414-c37f018903df
+#+begin_src rust
+  let s = format!("{}", 2.2);
+#+end_src
+
+合并字串
+#+name: 425fe069-3e10-417a-8929-2551b7417db2
+#+begin_src rust
+  let bits = vec!["a", "b", "c"];
+  let s = bits.concat();
+#+end_src
+
+像python中的str.join
+#+name: f91f9154-1da8-4788-a969-dc72a2e281c1
+#+begin_src rust
+  let bits = vec!["a", "b", "c"];
+  let s = bits.join("\n");
+#+end_src
+
+取子串:
+: s.chars()
+
+其它:
+contains, replace, trim, split
 
 测试:
 string.contains, string.starts_with, string.ends_with, string.find
@@ -227,6 +232,8 @@ string.chars
 
 &string: shared reference to string
 &str: string slice
+*** TODO hash maps
+- [[https://doc.rust-lang.org/book/second-edition/ch08-03-hash-maps.html][Hash Maps - Hash Maps - The Rust Programming Language]]
 
 *** TODO structs
 这个像namedtuple, C里的结构体. 通名称来指认内部成员更方便些.
@@ -337,7 +344,7 @@ fn sqrt(x: f64) -> f64 {
 
 #+END_SRC
 
-* tests [0/1]
+* tests [0/0]
 ** scratch
 #+name: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
 #+begin_src shell :results output
@@ -345,19 +352,6 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
-#+begin_example
-this is a hello world
-12
-loop: 0, sum = 0
-loop: 1, sum = 1
-loop: 2, sum = 3
-loop: 3, sum = 6
-loop: 4, sum = 10
-4
-x='好', s="good to go to do"
-3
-Chars { iter: Iter([121, 204, 134]) }
-#+end_example
 
 ** hamming distance
 *** test
@@ -522,12 +516,14 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   }
 
   fn test_string () {
-      let mut s = "good to go to do".to_string();
-      s.push('好');
-      let x = s.pop();
-      println!("x={:?}, s={:?}", x.unwrap(), s);
-      println!("{}", "y̆".len());
-      println!("{:?}", "y̆".chars());
+      // let mut s = "good to go to do".to_string();
+      // s.push('好');
+      // let x = s.pop();
+      // println!("x={:?}, s={:?}", x.unwrap(), s);
+      // println!("{}", "y̆".len());
+      // println!("{:?}", "y̆".chars());
+      let mut s = "good";
+      println!("{:?}", s);
   }
 
   fn main() {
