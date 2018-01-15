@@ -352,6 +352,15 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 #+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
+: this is a hello world
+: 12
+: loop: 0, sum = 0
+: loop: 1, sum = 1
+: loop: 2, sum = 3
+: loop: 3, sum = 6
+: loop: 4, sum = 10
+: 4
+: {"Blue": 10}
 
 ** hamming distance
 *** test
@@ -526,6 +535,14 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       println!("{:?}", s);
   }
 
+  fn test_hashmap() {
+      use std::collections::HashMap;
+      let mut scores = HashMap::new();
+      scores.insert("Blue", 10);
+      // scores.insert("Blue", 20.); adding float will fail
+      println!("{:?}", scores);
+  }
+
   fn main() {
       // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
       // println!("{:?}", bytes);
@@ -541,7 +558,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
       let mut v = sqrt(sum);
       println!("{}", v);
-      test_string();
+      test_hashmap();
   }
 #+END_SRC
 

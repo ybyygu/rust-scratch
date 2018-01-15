@@ -54,7 +54,15 @@ fn test_string () {
     // println!("{}", "y̆".len());
     // println!("{:?}", "y̆".chars());
     let mut s = "good";
-    println!("{:?}", s + "xx");
+    println!("{:?}", s);
+}
+
+fn test_hashmap() {
+    use std::collections::HashMap;
+    let mut scores = HashMap::new();
+    scores.insert("Blue", 10);
+    // scores.insert("Blue", 20.); adding float will fail
+    println!("{:?}", scores);
 }
 
 fn main() {
@@ -72,6 +80,6 @@ fn main() {
 
     let mut v = sqrt(sum);
     println!("{}", v);
-    test_string();
+    test_hashmap();
 }
 // b08803c2-e9b1-4542-9574-b8c467d527b1 ends here
