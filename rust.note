@@ -4,6 +4,11 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/3]
+** [2018-01-17 Wed] rust基础练习4: 简单命令行界面
+可以使用std::env来提取. env::args返回的是Iterator, 其中每个参数都为string类型.
+
+复杂点的可以用[[https://github.com/kbknapp/clap-rs][clap]].
+
 ** [2018-01-01 Mon] rust ownership :ATTACH:
 :PROPERTIES:
 :ID:       dfcf2ff4-7214-483f-8b66-bf76a0372e8a
@@ -339,8 +344,13 @@ fn sqrt(x: f64) -> f64 {
   version = "0.1.0"
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
+  [[bin]]
+  name = "cmdline"
+  path = "src/cmdline/main.rs"
+
   [dependencies]
-  base64 = "0.8.0"
+  base64 = "*"
+  clap = "*"
 
 #+END_SRC
 
@@ -470,6 +480,53 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+end_src
 
 * src
+** cmdline
+:PROPERTIES:
+:header-args: :tangle src/cmdline/main.rs
+:END:
+
+#+name: d0e077ec-1065-4135-a81d-db3d27ffd37e
+#+begin_src rust
+  extern crate clap;
+
+  use std::env;
+  use clap::{App, Arg};
+
+  fn main() {
+      // let args: Vec<String> = env::args().collect();
+      // println!("{:?}", args);
+      // println!("{:?}", args.len());
+      let matches = App::new("MyApp")
+          .version("0.1")
+          .author("Wenping Guo <winpng@gmail.com>")
+          .about("Does awesome things")
+          .arg(
+              Arg::with_name("debug")
+                  .help("debug switch")
+                  .long("debug")
+                  .multiple(true)
+                  .short("d")
+          )
+          .arg(
+              Arg::with_name("output")
+                  .help("set output filename")
+                  .index(1)
+          )
+          .get_matches();
+
+      match matches.occurrences_of("debug") {
+          0 => println!("Debug mode is off"),
+          1 => println!("Debug mode is kind of on"),
+          2 => println!("Debug mode is on"),
+          3 | _ => println!("Don't be crazy"),
+      }
+
+      if let Some(o) = matches.value_of("output") {
+          println!("Value for output: {}", o);
+      }
+  }
+#+end_src
+
 ** main
 :PROPERTIES:
 :header-args: :tangle src/main.rs
