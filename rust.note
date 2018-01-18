@@ -3,7 +3,29 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [0/3]
+* Memo [0/4]
+** [2018-01-18 Thu] Result和Option类型
+Result枚举类型是对所有返回值的完全分类：正常（Ok）或出错（Err）。Option枚举类型
+是对所有可选项的完全分类，有值（Some）或无值（None）。
+
+Result和Option经常用于匹配参数返回不同数据上（match）。
+
+Reference
+- [[https://doc.rust-lang.org/std/result/][std::result - Rust]]
+- [[https://doc.rust-lang.org/std/option/][std::option - Rust]]
+
+** [2018-01-18 Thu] [[https://blog.rust-lang.org/2017/12/21/rust-in-2017.html][Rust in 2017: what we achieved]]
+感觉上是python和C的完美结合.
+
+- [[https://github.com/rust-lang-nursery/tempdir][rust-lang-nursery/tempdir: Temporary directory management for Rust]]
+- [[https://github.com/rayon-rs/rayon][rayon-rs/rayon: Rayon: A data parallelism library for Rust]]
+
+
+** TODO [2018-01-17 Wed] 使用log工具
+- [[https://github.com/rust-lang-nursery/log][rust-lang-nursery/log: Logging implementation for Rust]]
+
+log将和slog合并: [[https://github.com/rust-lang-nursery/log/issues/149][Structured Logging · Issue #149 · rust-lang-nursery/log]]
+
 ** [2018-01-17 Wed] rust基础练习4: 简单命令行界面
 可以使用std::env来提取. env::args返回的是Iterator, 其中每个参数都为string类型.
 
@@ -331,10 +353,14 @@ fn sqrt(x: f64) -> f64 {
 函数返回值以最后一个语句为准, 因此return可以略去(同时去掉最后的分号).
 
 ** TODO [2017-12-12 Tue] 使用rust实现之前写的files-coder
+- [[https://github.com/hyperium/mime/][hyperium/mime: MIMEs in Rust]]
+
 ** [2017-12-10 Sun] 使用cargo来管理rust程序
 : cargo new test1 --bin
-: cargo run test1
 
+: cargo run
+快速语法检查:
+: cargo check
 
 * cargo
 #+name: 7935cdce-84b1-4d22-a63d-7d0a8580a279
@@ -620,7 +646,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+END_SRC
 
 * References
-- Programming rust
+- [[https://rust-lang-nursery.github.io/rust-cookbook/basics.html][Rust Cookbook]]
 - [[http://stevedonovan.github.io/rust-gentle-intro/readme.html][Introduction - A Gentle Introduction to Rust]]
 - [[https://rustbyexample.com/][Introduction - Rust By Example]]
 - [[https://learnxinyminutes.com/docs/rust/][Learn rust in Y Minutes]]
