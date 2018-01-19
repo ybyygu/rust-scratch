@@ -4,6 +4,11 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/4]
+** [2018-01-19 Fri] 文件读写
+- [[https://doc.rust-lang.org/std/fs/struct.File.html][std::fs::File - Rust]]
+- [[https://doc.rust-lang.org/std/io/index.html][std::io - Rust]]
+- [[https://doc.rust-lang.org/std/io/struct.BufReader.html][std::io::BufReader - Rust]]
+
 ** [2018-01-18 Thu] Result和Option类型
 Result枚举类型是对所有返回值的完全分类：正常（Ok）或出错（Err）。Option枚举类型
 是对所有可选项的完全分类，有值（Some）或无值（None）。
@@ -19,7 +24,6 @@ Reference
 
 - [[https://github.com/rust-lang-nursery/tempdir][rust-lang-nursery/tempdir: Temporary directory management for Rust]]
 - [[https://github.com/rayon-rs/rayon][rayon-rs/rayon: Rayon: A data parallelism library for Rust]]
-
 
 ** TODO [2018-01-17 Wed] 使用log工具
 - [[https://github.com/rust-lang-nursery/log][rust-lang-nursery/log: Logging implementation for Rust]]
@@ -377,6 +381,7 @@ fn sqrt(x: f64) -> f64 {
   [dependencies]
   base64 = "*"
   clap = "*"
+  zip = "*"
 
 #+END_SRC
 
@@ -517,6 +522,18 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
   use std::env;
   use clap::{App, Arg};
+  use std::io;
+  use std::io::prelude::*;
+  use std::fs::File;
+  use std::io::BufReader;
+
+  fn readfile(filename: &str){
+      let mut f = File::open(filename).expect("file not found");
+      let reader = BufReader::new(f);
+      for line in reader.lines() {
+          println!("line: {:?}", line);
+      }
+  }
 
   fn main() {
       // let args: Vec<String> = env::args().collect();
@@ -534,8 +551,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
                   .short("d")
           )
           .arg(
-              Arg::with_name("output")
-                  .help("set output filename")
+              Arg::with_name("input")
+                  .help("set input file name")
                   .index(1)
           )
           .get_matches();
@@ -547,8 +564,9 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
           3 | _ => println!("Don't be crazy"),
       }
 
-      if let Some(o) = matches.value_of("output") {
-          println!("Value for output: {}", o);
+      if let Some(o) = matches.value_of("input") {
+          println!("Value for input: {}", o);
+          readfile(o);
       }
   }
 #+end_src
