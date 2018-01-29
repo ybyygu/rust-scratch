@@ -1,5 +1,7 @@
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::b08803c2-e9b1-4542-9574-b8c467d527b1][b08803c2-e9b1-4542-9574-b8c467d527b1]]
 // extern crate base64;
+#[macro_use]
+extern crate nom;
 
 fn sqrt(x: f64) -> f64 {
     let mut y:f64 = if x < 5. {5.} else {10.};
@@ -65,6 +67,15 @@ fn test_hashmap() {
     println!("{:?}", scores);
 }
 
+fn test_nom(){
+    named!(get_greeting<&str,&str>,
+           take_s!(2)
+    );
+
+    let res = get_greeting("hi there");
+    println!("{:?}",res);
+}
+
 fn main() {
     // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
     // println!("{:?}", bytes);
@@ -80,6 +91,7 @@ fn main() {
 
     let mut v = sqrt(sum);
     println!("{}", v);
-    test_hashmap();
+    // test_hashmap();
+    test_nom();
 }
 // b08803c2-e9b1-4542-9574-b8c467d527b1 ends here

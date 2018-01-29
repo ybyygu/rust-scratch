@@ -3,7 +3,11 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [0/4]
+* Memo [0/5]
+** TODO [2018-01-28 Sun] 使用nom解析格式化文件
+- [[https://stevedonovan.github.io/rust-gentle-intro/nom-intro.html#parsing-text-with-nom][Parsing with Nom - A Gentle Introduction to Rust]]
+- [[http://rust.unhandledexpression.com/nom/][nom - Rust]]
+
 ** [2018-01-19 Fri] 文件读写
 - [[https://doc.rust-lang.org/std/fs/struct.File.html][std::fs::File - Rust]]
 - [[https://doc.rust-lang.org/std/io/index.html][std::io - Rust]]
@@ -382,6 +386,7 @@ fn sqrt(x: f64) -> f64 {
   base64 = "*"
   clap = "*"
   zip = "*"
+  nom = "*"
 
 #+END_SRC
 
@@ -389,19 +394,8 @@ fn sqrt(x: f64) -> f64 {
 ** scratch
 #+name: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
 #+begin_src shell :results output
-  cargo run test1
+  cargo run
 #+end_src
-
-#+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
-: this is a hello world
-: 12
-: loop: 0, sum = 0
-: loop: 1, sum = 1
-: loop: 2, sum = 3
-: loop: 3, sum = 6
-: loop: 4, sum = 10
-: 4
-: {"Blue": 10}
 
 ** hamming distance
 *** test
@@ -526,13 +520,40 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   use std::io::prelude::*;
   use std::fs::File;
   use std::io::BufReader;
+  use std::cmp::Eq;
+
+
+  #[derive (Default, Debug, PartialEq, PartialOrd, Clone)]
+  /// Point3D, a point / position within 3D space
+  pub struct Point3D {
+      pub x: f64,
+      pub y: f64,
+      pub z: f64
+  }
+
+  impl Point3D {
+      pub fn new(x: f64, y: f64, z: f64) -> Self {
+          Point3D {x: x, y: y, z: z}
+      }
+  }
+
+  impl Eq for Point3D {}
+
+  #[test]
+  fn point_3d_test() {
+      let p = Point3D::new(0., 0., 0.);
+      assert!(p.x == 0.);
+      assert!(p.y == 0.);
+      assert!(p.z == 0.);
+
+      let p2 = Point3D::new(0., 0., 0.);
+      assert!(p == p2);
+  }
+
 
   fn readfile(filename: &str){
-      let mut f = File::open(filename).expect("file not found");
+      let mut f = File::open(filename).expect("cannot open file");
       let reader = BufReader::new(f);
-      for line in reader.lines() {
-          println!("line: {:?}", line);
-      }
   }
 
   fn main() {
@@ -579,6 +600,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+name: b08803c2-e9b1-4542-9574-b8c467d527b1
 #+BEGIN_SRC rust
   // extern crate base64;
+  #[macro_use]
+  extern crate nom;
 
   fn sqrt(x: f64) -> f64 {
       let mut y:f64 = if x < 5. {5.} else {10.};
@@ -644,6 +667,15 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       println!("{:?}", scores);
   }
 
+  fn test_nom(){
+      named!(get_greeting<&str,&str>,
+             take_s!(2)
+      );
+
+      let res = get_greeting("hi there");
+      println!("{:?}",res);
+  }
+
   fn main() {
       // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
       // println!("{:?}", bytes);
@@ -659,7 +691,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
       let mut v = sqrt(sum);
       println!("{}", v);
-      test_hashmap();
+      // test_hashmap();
+      test_nom();
   }
 #+END_SRC
 
