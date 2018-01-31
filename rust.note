@@ -8,6 +8,11 @@
 - [[https://stevedonovan.github.io/rust-gentle-intro/nom-intro.html#parsing-text-with-nom][Parsing with Nom - A Gentle Introduction to Rust]]
 - [[http://rust.unhandledexpression.com/nom/][nom - Rust]]
 
+nom的优点:
+- 解析单元可自由组合 (parser combinator library)
+- 容易调试, 容易集成. 方便实现更复杂的解析逻辑
+- 比regex更快.
+
 ** [2018-01-19 Fri] 文件读写
 - [[https://doc.rust-lang.org/std/fs/struct.File.html][std::fs::File - Rust]]
 - [[https://doc.rust-lang.org/std/io/index.html][std::io - Rust]]
@@ -172,7 +177,7 @@ vector是动态数组, 同array一样, 成员类型要一致.
 单引号: char
 双引号: literal string
 
-**** string literal
+**** str, string literal
 双引号中的为literal string (&'static str). literal string为静态数据类型, 就像是整型, 浮点型.
 
 中间可以包括硬回车或转义字符.
@@ -206,6 +211,8 @@ lieral string可用的函数:
 #+end_src
 
 **** String
+内存动态分配的string.
+
 [[https://doc.rust-lang.org/std/string/struct.String.html][std::string::String - Rust]]
 
 A UTF-8 encoded, growable string
@@ -503,6 +510,42 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       s.chars().rev().collect::<String>()
   }
 #+end_src
+
+* reaction
+** cargo
+#+name: d5f68605-90cb-4b2b-b316-2025d935c17b
+#+BEGIN_SRC conf :tangle reaction/Cargo.toml
+  [package]
+  name = "reac"
+  version = "0.1.0"
+  authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+  [dependencies]
+  petgraph = "*"
+#+END_SRC
+
+** src
+*** main
+:PROPERTIES:
+:header-args: :tangle reaction/src/main.rs
+:END:
+#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
+#+BEGIN_SRC rust
+  extern crate petgraph;
+  // use petgraph::prelude::*;
+  use petgraph as pg;
+
+  fn main() {
+      println!("this is a hello {}", "world");
+      let mut G = pg::Graph::new_undirected();
+      let a = G.add_node(0);
+      let b = G.add_node(1);
+      G.add_edge(a, b, 2);
+      let n = G.node_count();
+      let nc = pg::algo::connected_components(&G);
+      println!("{}  {}", n, nc);
+  }
+#+END_SRC
 
 * src
 ** cmdline
