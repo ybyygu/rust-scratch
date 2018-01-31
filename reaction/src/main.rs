@@ -6,6 +6,7 @@ use std::fs::File;
 use std::error::Error;
 use std::io::{self, BufReader};
 use std::io::prelude::*;
+use std::collections::HashMap;
 use std::path::Path;
 
 use petgraph::prelude::*;
@@ -31,7 +32,10 @@ fn get_edge_from_line(line: &str) -> Vec<(&str, &str)>{
 }
 
 fn show_fragments(graph: &UnGraph<&str, i32>) {
-    ;
+    let sccs = pg::algo::kosaraju_scc(&graph);
+    for x in sccs {
+        println!("{:?}", x);
+    }
 }
 
 /// read data from file
@@ -89,10 +93,22 @@ fn read_from_file(filename: &str){
         }
         // 4. read in bonds lines for each atom
         G.clear();
+        // construct graph structure
+        let mut node_indices = HashMap::new();
+        for x in 1..(natoms+1) {
+            let n = G.add_node("X");
+            node_indices.insert(format!("{}", x), n);
+        }
+
         for i in 0..natoms {
             match lines_iter.next(){
                 Some(line) => {
                     let bonds = get_edge_from_line(&line);
+                    for (a1, a2) in bonds {
+                        let k1 = node_indices.get(a1).unwrap();
+                        let k2 = node_indices.get(a2).unwrap();
+                        G.add_edge(*k1, *k2, 1);
+                    }
                 },
                 None => {
                     panic!("file seems not complete: expected {} lines, acutaully read {:?} lines.", natoms, i)

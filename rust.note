@@ -4,6 +4,9 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/5]
+** [2018-01-31 Wed] 使用petgraph来操作图论结构
+没有networkx的api那么方便.
+
 ** TODO [2018-01-28 Sun] 使用nom解析格式化文件
 - [[https://stevedonovan.github.io/rust-gentle-intro/nom-intro.html#parsing-text-with-nom][Parsing with Nom - A Gentle Introduction to Rust]]
 - [[http://rust.unhandledexpression.com/nom/][nom - Rust]]
@@ -542,6 +545,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   use std::error::Error;
   use std::io::{self, BufReader};
   use std::io::prelude::*;
+  use std::collections::HashMap;
   use std::path::Path;
 
   use petgraph::prelude::*;
@@ -566,8 +570,12 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       bonds
   }
 
+  // print all connected components
   fn show_fragments(graph: &UnGraph<&str, i32>) {
-      ;
+      let sccs = pg::algo::kosaraju_scc(&graph);
+      for x in sccs {
+          println!("{:?}", x);
+      }
   }
 
   /// read data from file
@@ -625,10 +633,22 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
           }
           // 4. read in bonds lines for each atom
           G.clear();
+          // construct graph structure
+          let mut node_indices = HashMap::new();
+          for x in 1..(natoms+1) {
+              let n = G.add_node("X");
+              node_indices.insert(format!("{}", x), n);
+          }
+
           for i in 0..natoms {
               match lines_iter.next(){
                   Some(line) => {
                       let bonds = get_edge_from_line(&line);
+                      for (a1, a2) in bonds {
+                          let k1 = node_indices.get(a1).unwrap();
+                          let k2 = node_indices.get(a2).unwrap();
+                          G.add_edge(*k1, *k2, 1);
+                      }
                   },
                   None => {
                       panic!("file seems not complete: expected {} lines, acutaully read {:?} lines.", natoms, i)
