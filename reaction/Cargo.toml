@@ -1,0 +1,10 @@
+# [[file:~/Workspace/Programming/rust-scratch/rust.note::d5f68605-90cb-4b2b-b316-2025d935c17b][d5f68605-90cb-4b2b-b316-2025d935c17b]]
+[package]
+name = "reac"
+version = "0.1.0"
+authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+[dependencies]
+petgraph = "*"
+clap = "*"
+# d5f68605-90cb-4b2b-b316-2025d935c17b ends here
