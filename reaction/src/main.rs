@@ -1,4 +1,4 @@
-// [[file:~/Workspace/Programming/rust-scratch/rust.note::b8ea57f0-b549-4fa0-ac1a-abf83009009e][b8ea57f0-b549-4fa0-ac1a-abf83009009e]]
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::68b8f3aa-b3f8-43c0-8b4d-c3165b146535][68b8f3aa-b3f8-43c0-8b4d-c3165b146535]]
 extern crate petgraph;
 extern crate clap;
 
@@ -11,7 +11,9 @@ use std::path::Path;
 
 use petgraph::prelude::*;
 use petgraph as pg;
+// 68b8f3aa-b3f8-43c0-8b4d-c3165b146535 ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::b8ea57f0-b549-4fa0-ac1a-abf83009009e][b8ea57f0-b549-4fa0-ac1a-abf83009009e]]
 fn get_edge_from_line(line: &str) -> Vec<(&str, &str)>{
     //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
     let mut bonds = Vec::new();
@@ -31,6 +33,7 @@ fn get_edge_from_line(line: &str) -> Vec<(&str, &str)>{
     bonds
 }
 
+// print all connected components
 fn show_fragments(graph: &UnGraph<&str, i32>) {
     let sccs = pg::algo::kosaraju_scc(&graph);
     for x in sccs {

@@ -5,7 +5,37 @@
 
 * Memo [0/5]
 ** [2018-01-31 Wed] 使用petgraph来操作图论结构
-没有networkx的api那么方便.
+第一印象: 没有networkx的api那么方便.
+
+有三种graph类型.
+
+*** Graph
+: let node_index = G.add_node(weight);
+这和networkx的语法不同, add_node的参数是weight, 不是node数据. 返回值为node_index.
+
+: let edge_index = G.add_edge(n1, n2, edage_data);
+n1, n2为node_indices, edage_data可为任意数据类型. 返回值为edge_index
+
+: let node_weight = &G[node_index];
+: let edge_weight = &G[edge_index];
+有了indices, 可以方便地访问graph节点和边关联的数据.
+
+add_edge时需注意:默认petgraph充许parallel edges, 因此多次添加edge时, 会生成两个
+节点间的多个边. 使用update_edge函数可避免这个问题.
+*** GraphMap
+这个更接近于networkx中的Graph对象的实现方式. 基于petgraph作者写的[[https://github.com/bluss/ordermap][ordermap]] (后续
+可能会换名字: IndexMap).
+
+不充许parallel-edge(两个不同节点间有多条边), 但充许有self-loop(同一节点间形成的
+边).
+
+: G.add_node(n);
+其中n用来指示不同的node. 不能设定node data, 或者说n本身就是data(结构体).
+
+: G.add_edge(n1, n2, edge_data);
+添加节点n1和n2之间的边.
+
+*** StableGraph
 
 ** TODO [2018-01-28 Sun] 使用nom解析格式化文件
 - [[https://stevedonovan.github.io/rust-gentle-intro/nom-intro.html#parsing-text-with-nom][Parsing with Nom - A Gentle Introduction to Rust]]
@@ -391,15 +421,12 @@ fn sqrt(x: f64) -> f64 {
   version = "0.1.0"
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
-  [[bin]]
-  name = "cmdline"
-  path = "src/cmdline/main.rs"
-
   [dependencies]
   base64 = "*"
   clap = "*"
   zip = "*"
   nom = "*"
+  petgraph = "*"
 
 #+END_SRC
 
@@ -409,6 +436,8 @@ fn sqrt(x: f64) -> f64 {
 #+begin_src shell :results output
   cargo run
 #+end_src
+
+#+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
 
 ** hamming distance
 *** test
@@ -532,12 +561,12 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+END_SRC
 
 ** src
-*** main
 :PROPERTIES:
 :header-args: :tangle reaction/src/main.rs
 :END:
-#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
-#+BEGIN_SRC rust
+*** globals
+#+name: 68b8f3aa-b3f8-43c0-8b4d-c3165b146535
+#+begin_src rust
   extern crate petgraph;
   extern crate clap;
 
@@ -550,7 +579,15 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
   use petgraph::prelude::*;
   use petgraph as pg;
+#+end_src
 
+*** parse file
+
+*** graph operation
+
+*** main
+#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
+#+BEGIN_SRC rust
   fn get_edge_from_line(line: &str) -> Vec<(&str, &str)>{
       //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
       let mut bonds = Vec::new();
@@ -791,13 +828,16 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 :PROPERTIES:
 :header-args: :tangle src/main.rs
 :END:
-
-#+name: b08803c2-e9b1-4542-9574-b8c467d527b1
-#+BEGIN_SRC rust
+*** globals
+#+begin_src rust
   // extern crate base64;
   #[macro_use]
   extern crate nom;
-
+  extern crate petgraph;
+#+end_src
+*** basis
+#+name: b08803c2-e9b1-4542-9574-b8c467d527b1
+#+BEGIN_SRC rust
   fn sqrt(x: f64) -> f64 {
       let mut y:f64 = if x < 5. {5.} else {10.};
       loop {
@@ -862,6 +902,9 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       println!("{:?}", scores);
   }
 
+#+END_SRC
+*** nom
+#+begin_src rust
   fn test_nom(){
       named!(get_greeting<&str,&str>,
              take_s!(2)
@@ -870,26 +913,62 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       let res = get_greeting("hi there");
       println!("{:?}",res);
   }
+#+end_src
 
+*** petgraph
+#+begin_src rust
+  fn test_petgraph() {
+      use petgraph as pg;
+      use std::collections::HashMap;
+
+      let mut G = pg::Graph::new_undirected();
+      let aa = [0; 4];
+      let bb = [1; 4];
+      let x = G.add_node(aa);
+      let y = G.add_node(bb);
+      let e = G.add_edge(x, y, (1, 1));
+      let f = G.add_edge(x, y, (2, 2));
+      println!("{:?}", &G[x]);
+      println!("{:?}", &G[y]);
+      println!("{:?}", e);
+      println!("{:?}", &G[e]);
+      println!("{:?}", f);
+      println!("{:?}", &G[f]);
+  }
+
+  fn test_petgraph_graphmap() {
+      use petgraph as pg;
+      use petgraph::prelude::*;
+      let mut G = UnGraphMap::new();
+      G.add_node(("1", "H"));
+      G.add_node(("2", "H"));
+      G.add_node(("3", "C"));
+      G.add_edge(("1", "H"), ("2", "H"), 1);
+      println!("{:?}", &G);
+  }
+#+end_src
+
+*** cmdline
+#+begin_src rust
   fn main() {
       // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
       // println!("{:?}", bytes);
 
-      println!("this is a hello {}", "world");
-      println!("{}", 12);
+      // println!("this is a hello {}", "world");
+      // println!("{}", 12);
 
-      let mut sum = 0.;
-      for i in 0..5 {
-          sum += i as f64;
-          println!("loop: {}, sum = {}", i, sum);
-      }
+      // let mut sum = 0.;
+      // for i in 0..5 {
+      //     sum += i as f64;
+      //     println!("loop: {}, sum = {}", i, sum);
+      // }
 
-      let mut v = sqrt(sum);
-      println!("{}", v);
-      // test_hashmap();
-      test_nom();
+      // let mut v = sqrt(sum);
+      // println!("{}", v);
+
+      test_petgraph_graphmap();
   }
-#+END_SRC
+#+end_src
 
 * References
 - [[https://rust-lang-nursery.github.io/rust-cookbook/basics.html][Rust Cookbook]]
