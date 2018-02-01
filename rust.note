@@ -4,6 +4,15 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [0/5]
+** [2018-02-01 Thu] Eq与PartialEq
+- [[https://doc.rust-lang.org/std/cmp/trait.PartialEq.html][std::cmp::PartialEq - Rust]]
+- [[https://doc.rust-lang.org/std/cmp/trait.Eq.html][std::cmp::Eq - Rust]]
+- [[https://doc.servo.org/core/cmp/trait.Ord.html][core::cmp::Ord - Rust]]
+
+Eq是PartialEq的加强版.
+
+PartialEq不要求自相等. 比如: a可以不等a(以浮点数为例).
+
 ** [2018-01-31 Wed] 使用petgraph来操作图论结构
 第一印象: 没有networkx的api那么方便.
 
@@ -829,12 +838,14 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 :header-args: :tangle src/main.rs
 :END:
 *** globals
+#+name: f8c09544-ff6f-4589-9c06-d83d9b36e3ab
 #+begin_src rust
   // extern crate base64;
   #[macro_use]
   extern crate nom;
   extern crate petgraph;
 #+end_src
+
 *** basis
 #+name: b08803c2-e9b1-4542-9574-b8c467d527b1
 #+BEGIN_SRC rust
@@ -903,7 +914,9 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   }
 
 #+END_SRC
+
 *** nom
+#+name: 76f3c475-acd4-492d-b4fc-50da7265bfd9
 #+begin_src rust
   fn test_nom(){
       named!(get_greeting<&str,&str>,
@@ -916,6 +929,47 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+end_src
 
 *** petgraph
+定义最简单的原子结构信息.
+#+name: 1f84ef01-7ddb-4295-8521-c29ad7d7e059
+#+begin_src rust
+  use std::hash::{Hash, Hasher};
+  use std::cmp::Ordering;
+
+  #[derive (Default, Debug, Clone, Copy)]
+  /// simple atom data structure
+  pub struct Atom {
+      pub index: u64,
+      pub symbol: &'static str,
+  }
+
+  impl PartialEq for Atom {
+      fn eq(&self, other: &Atom) -> bool {
+          self.index == other.index
+      }
+  }
+
+  impl Eq for Atom {}
+
+  impl Hash for Atom {
+      fn hash<H: Hasher>(&self, state: &mut H) {
+          self.index.hash(state);
+      }
+  }
+
+  impl Ord for Atom {
+      fn cmp(&self, other: &Atom) -> Ordering {
+          self.index.cmp(&other.index)
+      }
+  }
+
+  impl PartialOrd for Atom {
+      fn partial_cmp(&self, other: &Atom) -> Option<Ordering> {
+          Some(self.cmp(other))
+      }
+  }
+#+end_src
+
+#+name: deb8ea39-2a90-4db1-987b-121d98047d53
 #+begin_src rust
   fn test_petgraph() {
       use petgraph as pg;
@@ -940,15 +994,28 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       use petgraph as pg;
       use petgraph::prelude::*;
       let mut G = UnGraphMap::new();
-      G.add_node(("1", "H"));
-      G.add_node(("2", "H"));
-      G.add_node(("3", "C"));
-      G.add_edge(("1", "H"), ("2", "H"), 1);
+
+      let a = Atom{
+          index: 1,
+          symbol: "H",
+      };
+
+      let b = Atom{
+          index:2,
+          symbol:"H",
+      };
+
+      println!("{:?}, {:?}", a, b);
+      G.add_node(a);
+      G.add_node(b);
+      G.add_edge(a, b, 1);
       println!("{:?}", &G);
+      println!("{:?}", &G[(a, b)]);
   }
 #+end_src
 
 *** cmdline
+#+name: 82c97bbd-b1b7-492e-8aa2-31271b45b049
 #+begin_src rust
   fn main() {
       // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();

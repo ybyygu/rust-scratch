@@ -1,9 +1,11 @@
-// [[file:~/Workspace/Programming/rust-scratch/rust.note::b08803c2-e9b1-4542-9574-b8c467d527b1][b08803c2-e9b1-4542-9574-b8c467d527b1]]
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::f8c09544-ff6f-4589-9c06-d83d9b36e3ab][f8c09544-ff6f-4589-9c06-d83d9b36e3ab]]
 // extern crate base64;
 #[macro_use]
 extern crate nom;
 extern crate petgraph;
+// f8c09544-ff6f-4589-9c06-d83d9b36e3ab ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::b08803c2-e9b1-4542-9574-b8c467d527b1][b08803c2-e9b1-4542-9574-b8c467d527b1]]
 fn sqrt(x: f64) -> f64 {
     let mut y:f64 = if x < 5. {5.} else {10.};
     loop {
@@ -67,7 +69,9 @@ fn test_hashmap() {
     // scores.insert("Blue", 20.); adding float will fail
     println!("{:?}", scores);
 }
+// b08803c2-e9b1-4542-9574-b8c467d527b1 ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::76f3c475-acd4-492d-b4fc-50da7265bfd9][76f3c475-acd4-492d-b4fc-50da7265bfd9]]
 fn test_nom(){
     named!(get_greeting<&str,&str>,
            take_s!(2)
@@ -76,7 +80,47 @@ fn test_nom(){
     let res = get_greeting("hi there");
     println!("{:?}",res);
 }
+// 76f3c475-acd4-492d-b4fc-50da7265bfd9 ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::1f84ef01-7ddb-4295-8521-c29ad7d7e059][1f84ef01-7ddb-4295-8521-c29ad7d7e059]]
+use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
+
+#[derive (Default, Debug, Clone, Copy)]
+/// simple atom data structure
+pub struct Atom {
+    pub index: u64,
+    pub symbol: &'static str,
+}
+
+impl PartialEq for Atom {
+    fn eq(&self, other: &Atom) -> bool {
+        self.index == other.index
+    }
+}
+
+impl Eq for Atom {}
+
+impl Hash for Atom {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
+impl Ord for Atom {
+    fn cmp(&self, other: &Atom) -> Ordering {
+        self.index.cmp(&other.index)
+    }
+}
+
+impl PartialOrd for Atom {
+    fn partial_cmp(&self, other: &Atom) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+// 1f84ef01-7ddb-4295-8521-c29ad7d7e059 ends here
+
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::deb8ea39-2a90-4db1-987b-121d98047d53][deb8ea39-2a90-4db1-987b-121d98047d53]]
 fn test_petgraph() {
     use petgraph as pg;
     use std::collections::HashMap;
@@ -100,13 +144,27 @@ fn test_petgraph_graphmap() {
     use petgraph as pg;
     use petgraph::prelude::*;
     let mut G = UnGraphMap::new();
-    G.add_node(("1", "H"));
-    G.add_node(("2", "H"));
-    G.add_node(("3", "C"));
-    G.add_edge(("1", "H"), ("2", "H"), 1);
-    println!("{:?}", &G);
-}
 
+    let a = Atom{
+        index: 1,
+        symbol: "H",
+    };
+
+    let b = Atom{
+        index:2,
+        symbol:"H",
+    };
+
+    println!("{:?}, {:?}", a, b);
+    G.add_node(a);
+    G.add_node(b);
+    G.add_edge(a, b, 1);
+    println!("{:?}", &G);
+    println!("{:?}", &G[(a, b)]);
+}
+// deb8ea39-2a90-4db1-987b-121d98047d53 ends here
+
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::82c97bbd-b1b7-492e-8aa2-31271b45b049][82c97bbd-b1b7-492e-8aa2-31271b45b049]]
 fn main() {
     // let bytes = base64::decode("aGVsbG8gd29ybGQ=").unwrap();
     // println!("{:?}", bytes);
@@ -125,4 +183,4 @@ fn main() {
 
     test_petgraph_graphmap();
 }
-// b08803c2-e9b1-4542-9574-b8c467d527b1 ends here
+// 82c97bbd-b1b7-492e-8aa2-31271b45b049 ends here
