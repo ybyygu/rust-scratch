@@ -118,6 +118,33 @@ impl PartialOrd for Atom {
         Some(self.cmp(other))
     }
 }
+
+#[test]
+fn test_atom() {
+    let a = Atom{
+        index: 1,
+        symbol: "H",
+    };
+
+    let b = Atom {
+        index: 2,
+        symbol: "H",
+
+    };
+    let mut c = Atom {
+        index: 1,
+        symbol: "H",
+    };
+
+    assert!(a != b);
+    assert!(a == c);
+
+    assert!(a.index == 1);
+    assert!(a.symbol == "H");
+
+    c.symbol = "C";
+    assert!(c.symbol == "C");
+}
 // 1f84ef01-7ddb-4295-8521-c29ad7d7e059 ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::deb8ea39-2a90-4db1-987b-121d98047d53][deb8ea39-2a90-4db1-987b-121d98047d53]]

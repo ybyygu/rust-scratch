@@ -967,6 +967,33 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
           Some(self.cmp(other))
       }
   }
+
+  #[test]
+  fn test_atom() {
+      let a = Atom{
+          index: 1,
+          symbol: "H",
+      };
+
+      let b = Atom {
+          index: 2,
+          symbol: "H",
+
+      };
+      let mut c = Atom {
+          index: 1,
+          symbol: "H",
+      };
+
+      assert!(a != b);
+      assert!(a == c);
+
+      assert!(a.index == 1);
+      assert!(a.symbol == "H");
+
+      c.symbol = "C";
+      assert!(c.symbol == "C");
+  }
 #+end_src
 
 #+name: deb8ea39-2a90-4db1-987b-121d98047d53
