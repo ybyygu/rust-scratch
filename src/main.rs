@@ -147,6 +147,56 @@ fn test_atom() {
 }
 // 1f84ef01-7ddb-4295-8521-c29ad7d7e059 ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::27fa4abe-d98c-4dd4-8695-e4b4f807cabc][27fa4abe-d98c-4dd4-8695-e4b4f807cabc]]
+use std::collections::HashMap;
+
+// fn get_reduced_formula<'a, I>(symbols: I) -> Option<&'static str>
+//     where I: Iterator<Item=&'static str>,
+// {
+//     for x in symbols {
+//         println!("{:?}", x);
+//     }
+
+//     Some("C2H4")
+// }
+
+fn get_reduced_formula(symbols: &[&str]) -> String {
+    let mut counts = HashMap::new();
+    for x in symbols {
+        let c = counts.entry(x).or_insert(0);
+        *c += 1;
+    }
+
+    let mut syms: Vec<String> = Vec::new();
+    let mut to_append = String::new();
+
+    for (k, v) in counts {
+        let reduced = format!("{}{}", k, v);
+        if *k == "C" {
+            syms.insert(0, reduced);
+        } else if *k == "H" {
+            to_append = reduced;
+        } else {
+            syms.push(reduced);
+        }
+    }
+    syms.push(to_append);
+    let formula = syms.join("");
+    formula
+}
+
+#[test]
+fn test_formula() {
+    let symbols   = vec!["C", "H", "C", "H", "H", "H"];
+    let formula = get_reduced_formula(&symbols);
+    assert!(formula == "C2H4".to_string());
+    let symbols   = vec!["C", "H", "C", "H", "H", "O", "H", "O"];
+    let formula = get_reduced_formula(&symbols);
+    println!("{:?}", formula);
+    assert!(formula == "C2O2H4".to_string());
+}
+// 27fa4abe-d98c-4dd4-8695-e4b4f807cabc ends here
+
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::deb8ea39-2a90-4db1-987b-121d98047d53][deb8ea39-2a90-4db1-987b-121d98047d53]]
 fn test_petgraph() {
     use petgraph as pg;
