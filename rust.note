@@ -3,7 +3,10 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [0/6]
+* Memo [0/7]
+** TODO [2018-02-03 Sat] 如何写一个能接受Iterator类型的函数
+- [[https://stackoverflow.com/questions/43057946/how-do-i-write-a-function-in-rust-that-accepts-any-iterator-whose-item-fulfills][How do I write a function in Rust that accepts any iterator whose Item fulfills a trait?]]
+
 ** TODO [2018-02-02 Fri] 错误处理
 - [[https://doc.rust-lang.org/book/second-edition/ch09-02-recoverable-errors-with-result.html#a-shortcut-for-propagating-errors-][A Shortcut for Propagating Errors: ?]]
 
@@ -729,7 +732,8 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-*** parse file
+*** parse lammps files
+**** data file
 从lammps data输入文件中读入结构信息.
 格式参考: [[http://lammps.sandia.gov/doc/2001/data_format.html][LAMMPS Data Format]]
 
@@ -746,7 +750,12 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 #+begin_src rust
   fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
       let mut reader = BufReader::new(file);
-      let mut lines_iter = reader.lines();
+      let mut lines_iter = reader.lines().peekable();
+
+      // println!("{:?}", lines_iter.peek());
+      // println!("{:?}", lines_iter.peek());
+
+      // return Ok("".to_string());
 
       // skip the first two lines
       for _ in 0..2 {
@@ -840,90 +849,46 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 
       Ok("G".to_string())
   }
-
-  fn open_file(filename: &str) -> Result<String, io::Error> {
-      // 1. guess required lammps files from input filename
-      let path = Path::new(filename);
-      let path_lammps_data = path.with_extension("data");
-      let path_lammps_bonds = path.with_extension("bonds");
-      let path_lammps_dump = path.with_extension("dump");
-
-      // assert!(path_lammps_data.is_file());
-      // assert!(path_lammps_bonds.is_file());
-
-      // Open the path in read-only mode, returns `io::Result<File>`
-      let f = File::open(path_lammps_data)?;
-      parse_lammps_data_file(f);
-
-      Ok("Good".to_string())
-  }
-
-  #[test]
-  fn test_open_file() {
-      let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
-      let fp = open_file(path);
-  }
-
 #+end_src
 
-*** graph operation
-#+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
+**** bonds file
+从bonds文件读入不同timestep时对应的键连信息.
+
+注意: 该文件中的给出的原子类型可能与data文件不同(测试文件的问题?). 应以data文件
+中的为准.
+
+***** 读入单个snapshot
+
+#+name: a0057eaf-1b2f-4b5d-a261-5e44f026a915
 #+begin_src rust
-  fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
-      //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
-      let line = &*line;
-      let mut bonds = Vec::new();
-      let mut attrs = line.split_whitespace();
-      // 1. get the first item
-
-      let current = attrs.nth(0).unwrap();
-      let nsymbol = attrs.next().unwrap();
-
-      if let Some(nb) = attrs.next() {
-          let nb = nb.parse::<u32>().unwrap();
-          for _ in 0..nb {
-              let other = attrs.next().unwrap();
-              bonds.push((current.to_string(), other.to_string()))
-          }
-      }
-      (current.to_string(), nsymbol.to_string(), bonds)
+  fn parse_lammps_bonds_single_snapshot<I>(lines: &mut I)
+      where I: Iterator<Item=io::Result<String>> ,
+  {
+      println!("{:?}", lines.nth(0));
   }
+#+end_src
 
-  // print all connected components
-  fn show_fragments(graph: &UnGraph<&str, i32>) {
-      let sccs = pg::algo::kosaraju_scc(&graph);
-      let mut symbols = vec![];
-      for x in sccs {
-          symbols.clear();
-          for index in x {
-              let t = graph[index];
-              match t {
-                  "1" => symbols.push("C"),
-                  "2" => symbols.push("H"),
-                  "3" => symbols.push("O"),
-                  "4" => symbols.push("N"),
-                  _   => println!("special case: {}", t),
-              }
-              let formula = get_reduced_formula(&symbols);
-              println!("{:?}", formula);
-          }
-      }
+***** 读入bonds文件
+#+name: ae4768b5-576f-461b-8186-7bb8b589216b
+#+header: :tangle no
+#+begin_src rust
+  fn parse_lammps_bonds_file(file: File) -> Result<String, io::Error> {
+      let mut reader = BufReader::new(file);
+      let mut lines_iter = reader.lines();
+
+      let mut timestep = 0 as u32;
+      let mut natoms = 0 as u32;
+
+      let lbl_timestep = "# Timestep";
+      let lbl_natoms   = "# Number of particles";
   }
+#+end_src
 
-  /// read data from file
-  fn read_from_file(filename: &str){
-      // Create a path to the desired file
-      let path = Path::new(filename);
-      let display = path.display();
-
-      // Open the path in read-only mode, returns `io::Result<File>`
-      let f = match File::open(filename){
-          // The `description` method of `io::Error` returns a string that
-          // describes the error
-          Err(why) => panic!("Couldn't open file {}: {}", display, why.description()),
-          Ok(file) => file,
-      };
-
+以下是旧版
+#+name: 6ff3d836-5b70-41e3-98fc-c3648edf6863
+#+header: :tangle no
+#+begin_src rust
+  fn read_from_file(filename: &str) {
       let mut reader = BufReader::new(f);
       let mut lines_iter = reader.lines().map(|l| l.unwrap());
       let mut timestep = 0 as u32;
@@ -1015,6 +980,82 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
           lines_iter.next();
       }
   }
+#+end_src
+
+**** dump file
+**** tests
+#+name: 2085aabc-b09b-4084-88d1-33699881e5e3
+#+begin_src rust
+  fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
+      // 1. guess required lammps files from input filename
+      let path = Path::new(filename);
+      let path_lammps_data = path.with_extension("data");
+      let path_lammps_bonds = path.with_extension("bonds");
+      let path_lammps_dump = path.with_extension("dump");
+
+      assert!(path_lammps_data.is_file());
+      assert!(path_lammps_bonds.is_file());
+
+      // Open the path in read-only mode, returns `io::Result<File>`
+      let f = File::open(path_lammps_data)?;
+      parse_lammps_data_file(f);
+      // let f = File:open(path_lammps_bonds)?;
+      // parse_lammps_bonds_file(f);
+
+      Ok("Good".to_string())
+  }
+
+  #[test]
+  fn test_open_file() {
+      let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
+      open_lammps_files(path);
+  }
+#+end_src
+
+*** graph operation
+#+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
+#+begin_src rust
+  fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
+      //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
+      let line = &*line;
+      let mut bonds = Vec::new();
+      let mut attrs = line.split_whitespace();
+      // 1. get the first item
+
+      let current = attrs.nth(0).unwrap();
+      let nsymbol = attrs.next().unwrap();
+
+      if let Some(nb) = attrs.next() {
+          let nb = nb.parse::<u32>().unwrap();
+          for _ in 0..nb {
+              let other = attrs.next().unwrap();
+              bonds.push((current.to_string(), other.to_string()))
+          }
+      }
+      (current.to_string(), nsymbol.to_string(), bonds)
+  }
+
+  // print all connected components
+  fn show_fragments(graph: &UnGraph<&str, i32>) {
+      let sccs = pg::algo::kosaraju_scc(&graph);
+      let mut symbols = vec![];
+      for x in sccs {
+          symbols.clear();
+          for index in x {
+              let t = graph[index];
+              match t {
+                  "1" => symbols.push("C"),
+                  "2" => symbols.push("H"),
+                  "3" => symbols.push("O"),
+                  "4" => symbols.push("N"),
+                  _   => println!("special case: {}", t),
+              }
+              let formula = get_reduced_formula(&symbols);
+              println!("{:?}", formula);
+          }
+      }
+  }
+
 
 #+end_src
 
@@ -1030,7 +1071,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       let matches = App::new("MyApp")
           .version("0.1")
           .author("Wenping Guo <winpng@gmail.com>")
-          .about("reaction analysis")
+          .about("lammps/reaxff reaction trajectory analysis")
           .arg(
               Arg::with_name("debug")
                   .help("debug switch")
@@ -1048,15 +1089,15 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       let r = matches.value_of("input");
       match r {
           Some(v) => Ok(v.to_string()),
-          None => Err("bad".to_string())
+          None => Err("bad input".to_string())
       }
   }
 
   fn main() {
       let filename = get_filename().unwrap();
       // read_from_file(filename.as_str());
-      let r = open_file(filename.as_str());
-      println!("{:?}", r);
+      // let r = open_file(filename.as_str());
+      // println!("{:?}", r);
   }
 #+END_SRC
 

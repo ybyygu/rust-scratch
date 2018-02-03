@@ -129,7 +129,12 @@ fn test_formula() {
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::1f4bb42e-6c9c-41d1-b9f3-e0908813187a][1f4bb42e-6c9c-41d1-b9f3-e0908813187a]]
 fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
     let mut reader = BufReader::new(file);
-    let mut lines_iter = reader.lines();
+    let mut lines_iter = reader.lines().peekable();
+
+    // println!("{:?}", lines_iter.peek());
+    // println!("{:?}", lines_iter.peek());
+
+    // return Ok("".to_string());
 
     // skip the first two lines
     for _ in 0..2 {
@@ -223,20 +228,32 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
 
     Ok("G".to_string())
 }
+// 1f4bb42e-6c9c-41d1-b9f3-e0908813187a ends here
 
-fn open_file(filename: &str) -> Result<String, io::Error> {
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::a0057eaf-1b2f-4b5d-a261-5e44f026a915][a0057eaf-1b2f-4b5d-a261-5e44f026a915]]
+fn parse_lammps_bonds_single_snapshot<I>(lines: &mut I)
+    where I: Iterator<Item=io::Result<String>> ,
+{
+    println!("{:?}", lines.nth(0));
+}
+// a0057eaf-1b2f-4b5d-a261-5e44f026a915 ends here
+
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::2085aabc-b09b-4084-88d1-33699881e5e3][2085aabc-b09b-4084-88d1-33699881e5e3]]
+fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
     // 1. guess required lammps files from input filename
     let path = Path::new(filename);
     let path_lammps_data = path.with_extension("data");
     let path_lammps_bonds = path.with_extension("bonds");
     let path_lammps_dump = path.with_extension("dump");
 
-    // assert!(path_lammps_data.is_file());
-    // assert!(path_lammps_bonds.is_file());
+    assert!(path_lammps_data.is_file());
+    assert!(path_lammps_bonds.is_file());
 
     // Open the path in read-only mode, returns `io::Result<File>`
     let f = File::open(path_lammps_data)?;
     parse_lammps_data_file(f);
+    // let f = File:open(path_lammps_bonds)?;
+    // parse_lammps_bonds_file(f);
 
     Ok("Good".to_string())
 }
@@ -244,9 +261,9 @@ fn open_file(filename: &str) -> Result<String, io::Error> {
 #[test]
 fn test_open_file() {
     let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
-    let fp = open_file(path);
+    open_lammps_files(path);
 }
-// 1f4bb42e-6c9c-41d1-b9f3-e0908813187a ends here
+// 2085aabc-b09b-4084-88d1-33699881e5e3 ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::84783441-0f98-4bd5-87a2-44b54dac4b22][84783441-0f98-4bd5-87a2-44b54dac4b22]]
 fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
@@ -289,112 +306,6 @@ fn show_fragments(graph: &UnGraph<&str, i32>) {
         }
     }
 }
-
-/// read data from file
-fn read_from_file(filename: &str){
-    // Create a path to the desired file
-    let path = Path::new(filename);
-    let display = path.display();
-
-    // Open the path in read-only mode, returns `io::Result<File>`
-    let f = match File::open(filename){
-        // The `description` method of `io::Error` returns a string that
-        // describes the error
-        Err(why) => panic!("Couldn't open file {}: {}", display, why.description()),
-        Ok(file) => file,
-    };
-
-    let mut reader = BufReader::new(f);
-    let mut lines_iter = reader.lines().map(|l| l.unwrap());
-    let mut timestep = 0 as u32;
-    let mut natoms = 0 as u32;
-    // representing molecule
-    // let mut G = Graph::new_undirected();
-
-    let lbl_timestep = "# Timestep";
-    let lbl_natoms   = "# Number of particles";
-    'outer: loop {
-        // 1. jump to the line containing Timestep
-        match lines_iter.nth(0) {
-            Some(line) => {
-                assert!(line.starts_with(lbl_timestep), line);
-                let x = line.chars().as_str().replace(&lbl_timestep, "");
-                timestep = x.trim().parse::<u32>().unwrap();
-                println!("current timestep: {}", timestep);
-            },
-            None => {
-                break;
-            }
-        }
-        // 2. read in number of atoms
-        let line = lines_iter.nth(1).unwrap();
-        assert!(line.starts_with(lbl_natoms), line);
-        // only necessary for the first time
-        if natoms == 0 {
-            let x = line.chars().as_str().replace(&lbl_natoms, "");
-            natoms = x.trim().parse::<u32>().unwrap();
-            println!("number of atoms: {:?}", natoms);
-        }
-        // 3. read in following 4 commenting lines
-        for _ in 0..4 {
-            if let Some(line) = lines_iter.next() {
-                println!("{}", line);
-            } else {
-                break; // fail
-            }
-        }
-        // 4. read in bonds lines for each atom
-        // construct graph structure
-        // let mut node_indices = HashMap::new();
-        // for x in 1..(natoms+1) {
-        //     let n = G.add_node("X");
-        //     node_indices.insert(format!("{}", x), n);
-        // }
-        // 5. parse current snapshot
-        let mut data = vec![];
-        for i in 0..natoms {
-            match lines_iter.next(){
-                Some(line) => {
-                    data.push(line);
-                },
-                None => {
-                    panic!("file seems not complete: expected {} lines, acutaully read {:?} lines.", natoms, i)
-                }
-            }
-        }
-        let mut G = Graph::new_undirected();
-        let mut node_indices = HashMap::new();
-        for line in &data {
-            // let n = G.add_node(nsymbol);
-            let line = &*line;
-            let mut attrs = line.split_whitespace();
-            let current = attrs.next().unwrap();
-            let nsymbol = attrs.next().unwrap();
-            let n = G.add_node(nsymbol);
-            node_indices.insert(current, n);
-        }
-        // add bonds
-        for line in &data {
-            let line = &*line;
-            let mut attrs = line.split_whitespace();
-            let current = attrs.next().unwrap();
-            attrs.next();
-            if let Some(nb) = attrs.next() {
-                let nb = nb.parse::<u32>().unwrap();
-                for _ in 0..nb {
-                    let other = attrs.next().unwrap();
-                    let n1 = node_indices.get(&current).unwrap();
-                    let n2 = node_indices.get(&other).unwrap();
-                    G.update_edge(*n1, *n2, 1);
-                }
-            }
-        }
-        show_fragments(&G);
-        // skip one line
-        // line = "#"
-        lines_iter.next();
-    }
-}
 // 84783441-0f98-4bd5-87a2-44b54dac4b22 ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::b8ea57f0-b549-4fa0-ac1a-abf83009009e][b8ea57f0-b549-4fa0-ac1a-abf83009009e]]
@@ -407,7 +318,7 @@ fn get_filename() -> Result<String, String> {
     let matches = App::new("MyApp")
         .version("0.1")
         .author("Wenping Guo <winpng@gmail.com>")
-        .about("reaction analysis")
+        .about("lammps/reaxff reaction trajectory analysis")
         .arg(
             Arg::with_name("debug")
                 .help("debug switch")
@@ -425,14 +336,14 @@ fn get_filename() -> Result<String, String> {
     let r = matches.value_of("input");
     match r {
         Some(v) => Ok(v.to_string()),
-        None => Err("bad".to_string())
+        None => Err("bad input".to_string())
     }
 }
 
 fn main() {
     let filename = get_filename().unwrap();
     // read_from_file(filename.as_str());
-    let r = open_file(filename.as_str());
-    println!("{:?}", r);
+    // let r = open_file(filename.as_str());
+    // println!("{:?}", r);
 }
 // b8ea57f0-b549-4fa0-ac1a-abf83009009e ends here
