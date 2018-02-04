@@ -3,7 +3,9 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [0/7]
+* Memo [0/8]
+** TODO [2018-02-04 Sun] 快被String, str, &str, "str"之间的区别搞死了
+** [2018-02-04 Sun] rust现在还不支持函数中使用默认参数 [[https://users.rust-lang.org/t/default-values-for-function-parameters/12483/3][URL]]
 ** TODO [2018-02-03 Sat] 如何写一个能接受Iterator类型的函数
 - [[https://stackoverflow.com/questions/43057946/how-do-i-write-a-function-in-rust-that-accepts-any-iterator-whose-item-fulfills][How do I write a function in Rust that accepts any iterator whose Item fulfills a trait?]]
 
@@ -568,7 +570,6 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 * reaction
 分析lammps生成的轨迹文件.
-
 ** cargo
 #+name: d5f68605-90cb-4b2b-b316-2025d935c17b
 #+BEGIN_SRC conf :tangle reaction/Cargo.toml
@@ -731,9 +732,22 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       assert!(formula == "C2O2H4".to_string());
   }
 #+end_src
+**** atom data
+定义与Atom相关的元信息
+#+name: 43366bc0-f1ca-4338-9289-0f637affbfda
+#+begin_src rust
+  #[derive(Debug, Default, Clone)]
+  struct AtomData{
+      index: usize,
+      symbol: String,
+      neighbors: Vec<usize>,
+      charge: f64,
+  }
+#+end_src
 
 *** parse lammps files
 **** data file
+***** info
 从lammps data输入文件中读入结构信息.
 格式参考: [[http://lammps.sandia.gov/doc/2001/data_format.html][LAMMPS Data Format]]
 
@@ -746,16 +760,12 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 3. 原子数型编号与元素的对应关系.
 4. 体系中所有的原子, 元素, 坐标等.
 
+***** src
 #+name: 1f4bb42e-6c9c-41d1-b9f3-e0908813187a
 #+begin_src rust
   fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
       let mut reader = BufReader::new(file);
       let mut lines_iter = reader.lines().peekable();
-
-      // println!("{:?}", lines_iter.peek());
-      // println!("{:?}", lines_iter.peek());
-
-      // return Ok("".to_string());
 
       // skip the first two lines
       for _ in 0..2 {
@@ -857,136 +867,201 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 注意: 该文件中的给出的原子类型可能与data文件不同(测试文件的问题?). 应以data文件
 中的为准.
 
-***** 读入单个snapshot
-
-#+name: a0057eaf-1b2f-4b5d-a261-5e44f026a915
-#+begin_src rust
-  fn parse_lammps_bonds_single_snapshot<I>(lines: &mut I)
-      where I: Iterator<Item=io::Result<String>> ,
-  {
-      println!("{:?}", lines.nth(0));
-  }
-#+end_src
-
-***** 读入bonds文件
+***** parse .bonds file
+读入bonds文件
 #+name: ae4768b5-576f-461b-8186-7bb8b589216b
-#+header: :tangle no
 #+begin_src rust
   fn parse_lammps_bonds_file(file: File) -> Result<String, io::Error> {
       let mut reader = BufReader::new(file);
-      let mut lines_iter = reader.lines();
+      let mut lines_iter = reader.lines().peekable();
+      parse_lammps_bonds_single_snapshot(&mut lines_iter);
 
-      let mut timestep = 0 as u32;
-      let mut natoms = 0 as u32;
-
-      let lbl_timestep = "# Timestep";
-      let lbl_natoms   = "# Number of particles";
+      Ok("Good".to_string())
   }
 #+end_src
 
-以下是旧版
-#+name: 6ff3d836-5b70-41e3-98fc-c3648edf6863
-#+header: :tangle no
+***** parse a single snapshot
+读入单个snapshot
+****** 各个小的功能块, 方便测试.
+#+name: 772f2307-4bde-47b4-b839-435dabaf5f1a
 #+begin_src rust
-  fn read_from_file(filename: &str) {
-      let mut reader = BufReader::new(f);
-      let mut lines_iter = reader.lines().map(|l| l.unwrap());
-      let mut timestep = 0 as u32;
-      let mut natoms = 0 as u32;
-      // representing molecule
-      // let mut G = Graph::new_undirected();
-
-      let lbl_timestep = "# Timestep";
-      let lbl_natoms   = "# Number of particles";
-      'outer: loop {
-          // 1. jump to the line containing Timestep
-          match lines_iter.nth(0) {
-              Some(line) => {
-                  assert!(line.starts_with(lbl_timestep), line);
-                  let x = line.chars().as_str().replace(&lbl_timestep, "");
-                  timestep = x.trim().parse::<u32>().unwrap();
-                  println!("current timestep: {}", timestep);
-              },
-              None => {
-                  break;
-              }
+  fn get_int_data_from_comment_line(line: &str, prefix: &str) -> Result<usize, String> {
+      if line.starts_with(prefix) {
+          let s = line[prefix.len()..].trim().parse::<usize>();
+          match s {
+              Ok(v) => return Ok(v),
+              Err(why) => return Err(format!("{:?}", why)),
           }
-          // 2. read in number of atoms
-          let line = lines_iter.nth(1).unwrap();
-          assert!(line.starts_with(lbl_natoms), line);
-          // only necessary for the first time
-          if natoms == 0 {
-              let x = line.chars().as_str().replace(&lbl_natoms, "");
-              natoms = x.trim().parse::<u32>().unwrap();
-              println!("number of atoms: {:?}", natoms);
-          }
-          // 3. read in following 4 commenting lines
-          for _ in 0..4 {
-              if let Some(line) = lines_iter.next() {
-                  println!("{}", line);
-              } else {
-                  break; // fail
-              }
-          }
-          // 4. read in bonds lines for each atom
-          // construct graph structure
-          // let mut node_indices = HashMap::new();
-          // for x in 1..(natoms+1) {
-          //     let n = G.add_node("X");
-          //     node_indices.insert(format!("{}", x), n);
-          // }
-          // 5. parse current snapshot
-          let mut data = vec![];
-          for i in 0..natoms {
-              match lines_iter.next(){
-                  Some(line) => {
-                      data.push(line);
-                  },
-                  None => {
-                      panic!("file seems not complete: expected {} lines, acutaully read {:?} lines.", natoms, i)
-                  }
-              }
-          }
-          let mut G = Graph::new_undirected();
-          let mut node_indices = HashMap::new();
-          for line in &data {
-              // let n = G.add_node(nsymbol);
-              let line = &*line;
-              let mut attrs = line.split_whitespace();
-              let current = attrs.next().unwrap();
-              let nsymbol = attrs.next().unwrap();
-              let n = G.add_node(nsymbol);
-              node_indices.insert(current, n);
-          }
-          // add bonds
-          for line in &data {
-              let line = &*line;
-              let mut attrs = line.split_whitespace();
-              let current = attrs.next().unwrap();
-              attrs.next();
-              if let Some(nb) = attrs.next() {
-                  let nb = nb.parse::<u32>().unwrap();
-                  for _ in 0..nb {
-                      let other = attrs.next().unwrap();
-                      let n1 = node_indices.get(&current).unwrap();
-                      let n2 = node_indices.get(&other).unwrap();
-                      G.update_edge(*n1, *n2, 1);
-                  }
-              }
-          }
-          show_fragments(&G);
-          // skip one line
-          // line = "#"
-          lines_iter.next();
+      } else {
+          let msg = format!("Failed to get value {} for current frame: {}", prefix, line);
+          Err(msg)
       }
+  }
+
+  #[test]
+  fn test_get_int_data_from_comment_line() {
+      // get timestep
+      let r = get_int_data_from_comment_line("# Timestep 10", "# Timestep");
+      assert_eq!(r, Ok(10));
+      // get number of atoms
+      let r = get_int_data_from_comment_line("# Number of particles 684", "# Number of particles");
+      assert_eq!(r, Ok(684));
+
+      let r = get_int_data_from_comment_line("# Timestep 0.0", "# Timestep");
+      assert!(r.is_err());
+      let r = get_int_data_from_comment_line("12 22\n", "# Timestep");
+      assert!(r.is_err());
+  }
+
+  // fn get_atom_data_from_line(line: &str) -> Result<(AtomData, &[usize]), String> {
+  fn get_atom_data_from_line(line: &str) -> Result<AtomData, String> {
+      let mut data = AtomData {
+          index: 0,
+          symbol: String::from("1"),
+          charge: 0.,
+          neighbors: vec![],
+      };
+
+      let error = format!("Failed to parse atom data from: {}", line);
+
+      // 1. get index
+      let mut attrs = line.split_whitespace();
+      if let Some(v) = attrs.next() {
+          match v.parse::<usize>() {
+              Ok(v) => {
+                  data.index = v;
+              },
+              Err(why) => {
+                  return Err(format!("{:?}", why));
+              },
+          }
+      } else {
+          return Err(error);
+      }
+
+      // 2. get particle type
+      if let Some(v) = attrs.next() {
+          data.symbol = v.to_string();
+      } else {
+          return Err("failed to read particle type.".to_string());
+      }
+
+      // 3. get number of neighbors
+      let mut nneighbors = 0;
+      if let Some(v) = attrs.next() {
+          match v.parse::<usize>() {
+              Ok(v) => {
+                  nneighbors = v;
+              },
+              Err(why) => {
+                  return Err(format!("{:?}", why));
+              },
+          }
+      } else {
+          return Err("failed to read number of neighbors.".to_string());
+      }
+
+      // 4. get neighbors
+      // let mut neighbors = vec![];
+      for _ in 0..nneighbors {
+          if let Some(v) = attrs.next() {
+              match v.parse::<usize>() {
+                  Ok(v) => {
+                      // neighbors.push(v);
+                      data.neighbors.push(v);
+                  },
+                  Err(why) => {
+                      return Err(format!("{:?}", why));
+                  },
+              }
+          } else {
+              return Err(error);
+          }
+      }
+
+      Ok(data)
+  }
+
+  #[test]
+  fn test_get_atom_data_from_line() {
+      let line = " 121 3 2 301 28 0         0.978         0.978         1.956         2.000        -0.736 ";
+      let r = get_atom_data_from_line(&line);
+      assert!(r.is_ok());
+      // let (data, _) = r.unwrap();
+      let data = r.unwrap();
+      assert!(data.index == 121);
+      assert!(data.symbol == "3");
+  }
+
+#+end_src
+
+****** 最外层控制.
+#+name: a0057eaf-1b2f-4b5d-a261-5e44f026a915
+#+begin_src rust
+  use std::iter::Peekable;
+
+  fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), String>
+      where I: Iterator<Item=io::Result<String>> ,
+  {
+      let mut timestep = 0 as usize;
+      let mut natoms = 0 as usize;
+
+      // 1. read in meta data from comments
+      // expected => Some(Ok("# Timestep 0 "))
+      for n in 0..7 {
+          let line = lines_iter.next().unwrap().unwrap();
+          assert!(line.starts_with("# "), line);
+          match n {
+              0 => {
+                  timestep = get_int_data_from_comment_line(&line, "# Timestep").unwrap();
+                  println!("timestep = {:?}", timestep);
+              },
+              2 => {
+                  natoms = get_int_data_from_comment_line(&line, "# Number of particles").unwrap();
+                  println!("natoms {:?}", natoms);
+              },
+              _ => {;}
+          }
+      }
+
+      // 2. read atom data
+      // 2.1 setup graph
+      let mut gr = Graph::new_undirected();
+      for _ in 0..natoms {
+          gr.add_node("X".to_string());
+      }
+      // 2.2 assign atom symbols and bonds
+      for _ in 0..natoms {
+          if let Some(line) = lines_iter.next() {
+              let line = line.unwrap();
+              let data = get_atom_data_from_line(&line).unwrap();
+              let n1 = NodeIndex::new(&data.index - 1);
+
+              // add bonds
+              for i in &data.neighbors {
+                  let n2 = NodeIndex::new(i-1);
+                  gr.update_edge(n1, n2, 1);
+              }
+              // update atom symbol
+              let nw = gr.node_weight_mut(n1).unwrap();
+              ,*nw = data.symbol;
+          } else {
+              let msg = format!("atom data is incomplete\ntimestep = {}", timestep);
+              return Err(msg);
+          }
+      }
+      show_fragments(&gr);
+      Ok(())
   }
 #+end_src
 
 **** dump file
+需要从这里读入不同timestep时对应的构型.
+
 **** tests
 #+name: 2085aabc-b09b-4084-88d1-33699881e5e3
 #+begin_src rust
-  fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
+  fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
       // 1. guess required lammps files from input filename
       let path = Path::new(filename);
       let path_lammps_data = path.with_extension("data");
@@ -999,8 +1074,8 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       // Open the path in read-only mode, returns `io::Result<File>`
       let f = File::open(path_lammps_data)?;
       parse_lammps_data_file(f);
-      // let f = File:open(path_lammps_bonds)?;
-      // parse_lammps_bonds_file(f);
+      let f = File::open(path_lammps_bonds)?;
+      parse_lammps_bonds_file(f);
 
       Ok("Good".to_string())
   }
@@ -1008,13 +1083,40 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   #[test]
   fn test_open_file() {
       let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
-      open_lammps_files(path);
+      parse_lammps_files(path);
   }
 #+end_src
 
 *** graph operation
+**** fragments
 #+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
 #+begin_src rust
+  // print all connected components
+  fn show_fragments(graph: &UnGraph<String, usize>) {
+      let mut mapping_symbols = HashMap::new();
+      mapping_symbols.insert("1", "C");
+      mapping_symbols.insert("2", "H");
+      mapping_symbols.insert("3", "O");
+      mapping_symbols.insert("4", "N");
+
+      let sccs = pg::algo::kosaraju_scc(&graph);
+      let mut symbols = vec![];
+      for x in sccs {
+          symbols.clear();
+          for index in x {
+              let n = &graph[index].as_str();
+              let sym = mapping_symbols.get(n).unwrap();
+              symbols.push(*sym);
+              let formula = get_reduced_formula(&symbols);
+              println!("{:?}", formula);
+          }
+      }
+  }
+#+end_src
+
+**** to delete
+#+name: 643699b0-d380-4f9d-9c74-cdc0149f2fe5
+#+begin_src rust :tangle no
   fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
       //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
       let line = &*line;
@@ -1026,7 +1128,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       let nsymbol = attrs.next().unwrap();
 
       if let Some(nb) = attrs.next() {
-          let nb = nb.parse::<u32>().unwrap();
+          let nb = nb.parse::<usize>().unwrap();
           for _ in 0..nb {
               let other = attrs.next().unwrap();
               bonds.push((current.to_string(), other.to_string()))
@@ -1035,28 +1137,25 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       (current.to_string(), nsymbol.to_string(), bonds)
   }
 
-  // print all connected components
-  fn show_fragments(graph: &UnGraph<&str, i32>) {
-      let sccs = pg::algo::kosaraju_scc(&graph);
-      let mut symbols = vec![];
-      for x in sccs {
-          symbols.clear();
-          for index in x {
-              let t = graph[index];
-              match t {
-                  "1" => symbols.push("C"),
-                  "2" => symbols.push("H"),
-                  "3" => symbols.push("O"),
-                  "4" => symbols.push("N"),
-                  _   => println!("special case: {}", t),
-              }
-              let formula = get_reduced_formula(&symbols);
-              println!("{:?}", formula);
-          }
+#+end_src
+
+构建只有节点的图
+#+name: 3c84b2d2-ba94-4c2d-ab2c-cb7c9737c8af
+#+begin_src rust :tangle no
+  fn build_graph<'a>(natoms: usize) -> UnGraph<&'a AtomData, &'a usize> {
+      let gr = Graph::new_undirected();
+      for i in 0..natoms {
+          let d = AtomData{
+              index: 0,
+              symbol: "0",
+              charge: 0.,
+              neighbors: vec![],
+          };
+          gr.add_node(d);
       }
+
+      gr
   }
-
-
 #+end_src
 
 *** main

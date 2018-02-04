@@ -126,15 +126,20 @@ fn test_formula() {
 }
 // 27fa4abe-d98c-4dd4-8695-e4b4f807cabc ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::43366bc0-f1ca-4338-9289-0f637affbfda][43366bc0-f1ca-4338-9289-0f637affbfda]]
+#[derive(Debug, Default, Clone)]
+struct AtomData{
+    index: usize,
+    symbol: String,
+    neighbors: Vec<usize>,
+    charge: f64,
+}
+// 43366bc0-f1ca-4338-9289-0f637affbfda ends here
+
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::1f4bb42e-6c9c-41d1-b9f3-e0908813187a][1f4bb42e-6c9c-41d1-b9f3-e0908813187a]]
 fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
     let mut reader = BufReader::new(file);
     let mut lines_iter = reader.lines().peekable();
-
-    // println!("{:?}", lines_iter.peek());
-    // println!("{:?}", lines_iter.peek());
-
-    // return Ok("".to_string());
 
     // skip the first two lines
     for _ in 0..2 {
@@ -230,16 +235,186 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
 }
 // 1f4bb42e-6c9c-41d1-b9f3-e0908813187a ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::ae4768b5-576f-461b-8186-7bb8b589216b][ae4768b5-576f-461b-8186-7bb8b589216b]]
+fn parse_lammps_bonds_file(file: File) -> Result<String, io::Error> {
+    let mut reader = BufReader::new(file);
+    let mut lines_iter = reader.lines().peekable();
+    parse_lammps_bonds_single_snapshot(&mut lines_iter);
+
+    Ok("Good".to_string())
+}
+// ae4768b5-576f-461b-8186-7bb8b589216b ends here
+
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::772f2307-4bde-47b4-b839-435dabaf5f1a][772f2307-4bde-47b4-b839-435dabaf5f1a]]
+fn get_int_data_from_comment_line(line: &str, prefix: &str) -> Result<usize, String> {
+    if line.starts_with(prefix) {
+        let s = line[prefix.len()..].trim().parse::<usize>();
+        match s {
+            Ok(v) => return Ok(v),
+            Err(why) => return Err(format!("{:?}", why)),
+        }
+    } else {
+        let msg = format!("Failed to get value {} for current frame: {}", prefix, line);
+        Err(msg)
+    }
+}
+
+#[test]
+fn test_get_int_data_from_comment_line() {
+    // get timestep
+    let r = get_int_data_from_comment_line("# Timestep 10", "# Timestep");
+    assert_eq!(r, Ok(10));
+    // get number of atoms
+    let r = get_int_data_from_comment_line("# Number of particles 684", "# Number of particles");
+    assert_eq!(r, Ok(684));
+
+    let r = get_int_data_from_comment_line("# Timestep 0.0", "# Timestep");
+    assert!(r.is_err());
+    let r = get_int_data_from_comment_line("12 22\n", "# Timestep");
+    assert!(r.is_err());
+}
+
+// fn get_atom_data_from_line(line: &str) -> Result<(AtomData, &[usize]), String> {
+fn get_atom_data_from_line(line: &str) -> Result<AtomData, String> {
+    let mut data = AtomData {
+        index: 0,
+        symbol: String::from("1"),
+        charge: 0.,
+        neighbors: vec![],
+    };
+
+    let error = format!("Failed to parse atom data from: {}", line);
+
+    // 1. get index
+    let mut attrs = line.split_whitespace();
+    if let Some(v) = attrs.next() {
+        match v.parse::<usize>() {
+            Ok(v) => {
+                data.index = v;
+            },
+            Err(why) => {
+                return Err(format!("{:?}", why));
+            },
+        }
+    } else {
+        return Err(error);
+    }
+
+    // 2. get particle type
+    if let Some(v) = attrs.next() {
+        data.symbol = v.to_string();
+    } else {
+        return Err("failed to read particle type.".to_string());
+    }
+
+    // 3. get number of neighbors
+    let mut nneighbors = 0;
+    if let Some(v) = attrs.next() {
+        match v.parse::<usize>() {
+            Ok(v) => {
+                nneighbors = v;
+            },
+            Err(why) => {
+                return Err(format!("{:?}", why));
+            },
+        }
+    } else {
+        return Err("failed to read number of neighbors.".to_string());
+    }
+
+    // 4. get neighbors
+    // let mut neighbors = vec![];
+    for _ in 0..nneighbors {
+        if let Some(v) = attrs.next() {
+            match v.parse::<usize>() {
+                Ok(v) => {
+                    // neighbors.push(v);
+                    data.neighbors.push(v);
+                },
+                Err(why) => {
+                    return Err(format!("{:?}", why));
+                },
+            }
+        } else {
+            return Err(error);
+        }
+    }
+
+    Ok(data)
+}
+
+#[test]
+fn test_get_atom_data_from_line() {
+    let line = " 121 3 2 301 28 0         0.978         0.978         1.956         2.000        -0.736 ";
+    let r = get_atom_data_from_line(&line);
+    assert!(r.is_ok());
+    // let (data, _) = r.unwrap();
+    let data = r.unwrap();
+    assert!(data.index == 121);
+    assert!(data.symbol == "3");
+}
+// 772f2307-4bde-47b4-b839-435dabaf5f1a ends here
+
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::a0057eaf-1b2f-4b5d-a261-5e44f026a915][a0057eaf-1b2f-4b5d-a261-5e44f026a915]]
-fn parse_lammps_bonds_single_snapshot<I>(lines: &mut I)
+use std::iter::Peekable;
+
+fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), String>
     where I: Iterator<Item=io::Result<String>> ,
 {
-    println!("{:?}", lines.nth(0));
+    let mut timestep = 0 as usize;
+    let mut natoms = 0 as usize;
+
+    // 1. read in meta data from comments
+    // expected => Some(Ok("# Timestep 0 "))
+    for n in 0..7 {
+        let line = lines_iter.next().unwrap().unwrap();
+        assert!(line.starts_with("# "), line);
+        match n {
+            0 => {
+                timestep = get_int_data_from_comment_line(&line, "# Timestep").unwrap();
+                println!("timestep = {:?}", timestep);
+            },
+            2 => {
+                natoms = get_int_data_from_comment_line(&line, "# Number of particles").unwrap();
+                println!("natoms {:?}", natoms);
+            },
+            _ => {;}
+        }
+    }
+
+    // 2. read atom data
+    // 2.1 setup graph
+    let mut gr = Graph::new_undirected();
+    for _ in 0..natoms {
+        gr.add_node("X".to_string());
+    }
+    // 2.2 assign atom symbols and bonds
+    for _ in 0..natoms {
+        if let Some(line) = lines_iter.next() {
+            let line = line.unwrap();
+            let data = get_atom_data_from_line(&line).unwrap();
+            let n1 = NodeIndex::new(&data.index - 1);
+
+            // add bonds
+            for i in &data.neighbors {
+                let n2 = NodeIndex::new(i-1);
+                gr.update_edge(n1, n2, 1);
+            }
+            // update atom symbol
+            let nw = gr.node_weight_mut(n1).unwrap();
+            *nw = data.symbol;
+        } else {
+            let msg = format!("atom data is incomplete\ntimestep = {}", timestep);
+            return Err(msg);
+        }
+    }
+    show_fragments(&gr);
+    Ok(())
 }
 // a0057eaf-1b2f-4b5d-a261-5e44f026a915 ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::2085aabc-b09b-4084-88d1-33699881e5e3][2085aabc-b09b-4084-88d1-33699881e5e3]]
-fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
+fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
     // 1. guess required lammps files from input filename
     let path = Path::new(filename);
     let path_lammps_data = path.with_extension("data");
@@ -252,8 +427,8 @@ fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
     // Open the path in read-only mode, returns `io::Result<File>`
     let f = File::open(path_lammps_data)?;
     parse_lammps_data_file(f);
-    // let f = File:open(path_lammps_bonds)?;
-    // parse_lammps_bonds_file(f);
+    let f = File::open(path_lammps_bonds)?;
+    parse_lammps_bonds_file(f);
 
     Ok("Good".to_string())
 }
@@ -261,46 +436,27 @@ fn open_lammps_files(filename: &str) -> Result<String, io::Error> {
 #[test]
 fn test_open_file() {
     let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
-    open_lammps_files(path);
+    parse_lammps_files(path);
 }
 // 2085aabc-b09b-4084-88d1-33699881e5e3 ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::84783441-0f98-4bd5-87a2-44b54dac4b22][84783441-0f98-4bd5-87a2-44b54dac4b22]]
-fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
-    //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
-    let line = &*line;
-    let mut bonds = Vec::new();
-    let mut attrs = line.split_whitespace();
-    // 1. get the first item
-
-    let current = attrs.nth(0).unwrap();
-    let nsymbol = attrs.next().unwrap();
-
-    if let Some(nb) = attrs.next() {
-        let nb = nb.parse::<u32>().unwrap();
-        for _ in 0..nb {
-            let other = attrs.next().unwrap();
-            bonds.push((current.to_string(), other.to_string()))
-        }
-    }
-    (current.to_string(), nsymbol.to_string(), bonds)
-}
-
 // print all connected components
-fn show_fragments(graph: &UnGraph<&str, i32>) {
+fn show_fragments(graph: &UnGraph<String, usize>) {
+    let mut mapping_symbols = HashMap::new();
+    mapping_symbols.insert("1", "C");
+    mapping_symbols.insert("2", "H");
+    mapping_symbols.insert("3", "O");
+    mapping_symbols.insert("4", "N");
+
     let sccs = pg::algo::kosaraju_scc(&graph);
     let mut symbols = vec![];
     for x in sccs {
         symbols.clear();
         for index in x {
-            let t = graph[index];
-            match t {
-                "1" => symbols.push("C"),
-                "2" => symbols.push("H"),
-                "3" => symbols.push("O"),
-                "4" => symbols.push("N"),
-                _   => println!("special case: {}", t),
-            }
+            let n = &graph[index].as_str();
+            let sym = mapping_symbols.get(n).unwrap();
+            symbols.push(*sym);
             let formula = get_reduced_formula(&symbols);
             println!("{:?}", formula);
         }
