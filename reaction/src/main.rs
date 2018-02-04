@@ -137,7 +137,11 @@ struct AtomData{
 // 43366bc0-f1ca-4338-9289-0f637affbfda ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::1f4bb42e-6c9c-41d1-b9f3-e0908813187a][1f4bb42e-6c9c-41d1-b9f3-e0908813187a]]
-fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
+fn parse_lammps_data_file(file: File,
+                          natoms: &mut usize,
+                          mapping_symbols: &mut HashMap<String, String>)
+                          -> Result<String, io::Error>
+{
     let mut reader = BufReader::new(file);
     let mut lines_iter = reader.lines().peekable();
 
@@ -147,7 +151,6 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
     }
     // 1. read number of total atoms
     // 684  atoms
-    let mut natoms = 0;
     let nresult = lines_iter.next();
     println!("{:?}", nresult);
     if let Some(line) = nresult {
@@ -155,7 +158,7 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
         let line = line?;
         assert!(line.contains(" atoms"), format!("cannot find number of atoms: {}", line));
         let v: Vec<_> = line.split_whitespace().collect();
-        natoms = v[0].parse().unwrap();
+        *natoms = v[0].parse().unwrap();
     } else {
         eprintln!("{:?}", nresult);
     }
@@ -195,7 +198,6 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
     lines_iter.next();
 
     // mapping: atom_index ==> atom_symbol
-    let mut mapping_symbols = HashMap::new();
     for _ in 0..natom_types {
         if let Some(line) = lines_iter.next() {
             let line = line.unwrap();
@@ -205,7 +207,6 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
             mapping_symbols.insert(k.to_string(), v.to_string());
         }
     }
-    println!("{:?}", mapping_symbols);
 
     // 3. jump to Atom section
     loop {
@@ -221,8 +222,8 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
     // skip one blank line
     lines_iter.next();
     // 4. read in atom index and atom type
-    assert!(natoms > 0);
-    for _ in 0..natoms {
+    assert!(*natoms > 0);
+    for _ in 0..*natoms {
         if let Some(line) = lines_iter.next() {
             let line = line?;
             // println!("{}", line);
@@ -230,16 +231,19 @@ fn parse_lammps_data_file(file: File) -> Result<String, io::Error>{
             panic!("Atom records are incomplete.");
         }
     }
-
     Ok("G".to_string())
 }
 // 1f4bb42e-6c9c-41d1-b9f3-e0908813187a ends here
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::ae4768b5-576f-461b-8186-7bb8b589216b][ae4768b5-576f-461b-8186-7bb8b589216b]]
-fn parse_lammps_bonds_file(file: File) -> Result<String, io::Error> {
+fn parse_lammps_bonds_file(file: File,
+                           natoms: &usize,
+                           mapping_symbols: &HashMap<String, String>)
+                           -> Result<String, io::Error>
+{
     let mut reader = BufReader::new(file);
     let mut lines_iter = reader.lines().peekable();
-    parse_lammps_bonds_single_snapshot(&mut lines_iter);
+    parse_lammps_bonds_single_snapshot(&mut lines_iter, &natoms, &mapping_symbols);
 
     Ok("Good".to_string())
 }
@@ -358,11 +362,13 @@ fn test_get_atom_data_from_line() {
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::a0057eaf-1b2f-4b5d-a261-5e44f026a915][a0057eaf-1b2f-4b5d-a261-5e44f026a915]]
 use std::iter::Peekable;
 
-fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), String>
-    where I: Iterator<Item=io::Result<String>> ,
+fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I,
+                                         natoms: &usize,
+                                         mapping_symbols: &HashMap<String, String>)
+                                         -> Result<(), String>
+    where I: Iterator<Item=io::Result<String>>,
 {
     let mut timestep = 0 as usize;
-    let mut natoms = 0 as usize;
 
     // 1. read in meta data from comments
     // expected => Some(Ok("# Timestep 0 "))
@@ -375,8 +381,11 @@ fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), Strin
                 println!("timestep = {:?}", timestep);
             },
             2 => {
-                natoms = get_int_data_from_comment_line(&line, "# Number of particles").unwrap();
-                println!("natoms {:?}", natoms);
+                let na = get_int_data_from_comment_line(&line, "# Number of particles").unwrap();
+                if na != *natoms {
+                    let msg = format!("number of atoms: {} != {}", na, *natoms);
+                    return Err(msg);
+                }
             },
             _ => {;}
         }
@@ -385,11 +394,12 @@ fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), Strin
     // 2. read atom data
     // 2.1 setup graph
     let mut gr = Graph::new_undirected();
-    for _ in 0..natoms {
+    for _ in 0..*natoms {
         gr.add_node("X".to_string());
     }
+
     // 2.2 assign atom symbols and bonds
-    for _ in 0..natoms {
+    for _ in 0..*natoms {
         if let Some(line) = lines_iter.next() {
             let line = line.unwrap();
             let data = get_atom_data_from_line(&line).unwrap();
@@ -408,7 +418,7 @@ fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), Strin
             return Err(msg);
         }
     }
-    show_fragments(&gr);
+    show_fragments(&gr, &mapping_symbols);
     Ok(())
 }
 // a0057eaf-1b2f-4b5d-a261-5e44f026a915 ends here
@@ -426,9 +436,15 @@ fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
 
     // Open the path in read-only mode, returns `io::Result<File>`
     let f = File::open(path_lammps_data)?;
-    parse_lammps_data_file(f);
+
+    let mut natoms = 0;
+    let mut mapping_symbols: HashMap<String, String> = HashMap::new();
+    // read number of atoms and atom symbols from .data file
+    parse_lammps_data_file(f, &mut natoms, &mut mapping_symbols);
+
+    // read bonds from .bonds file
     let f = File::open(path_lammps_bonds)?;
-    parse_lammps_bonds_file(f);
+    parse_lammps_bonds_file(f, &natoms, &mapping_symbols);
 
     Ok("Good".to_string())
 }
@@ -442,21 +458,15 @@ fn test_open_file() {
 
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::84783441-0f98-4bd5-87a2-44b54dac4b22][84783441-0f98-4bd5-87a2-44b54dac4b22]]
 // print all connected components
-fn show_fragments(graph: &UnGraph<String, usize>) {
-    let mut mapping_symbols = HashMap::new();
-    mapping_symbols.insert("1", "C");
-    mapping_symbols.insert("2", "H");
-    mapping_symbols.insert("3", "O");
-    mapping_symbols.insert("4", "N");
-
+fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
     let sccs = pg::algo::kosaraju_scc(&graph);
     let mut symbols = vec![];
     for x in sccs {
         symbols.clear();
         for index in x {
-            let n = &graph[index].as_str();
+            let n = &graph[index];
             let sym = mapping_symbols.get(n).unwrap();
-            symbols.push(*sym);
+            symbols.push(sym.as_str());
             let formula = get_reduced_formula(&symbols);
             println!("{:?}", formula);
         }
