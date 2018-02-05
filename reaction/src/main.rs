@@ -243,7 +243,21 @@ fn parse_lammps_bonds_file(file: File,
 {
     let mut reader = BufReader::new(file);
     let mut lines_iter = reader.lines().peekable();
-    parse_lammps_bonds_single_snapshot(&mut lines_iter, &natoms, &mapping_symbols);
+
+    loop {
+        if lines_iter.peek().is_none() {
+            println!("reached the end of the file.");
+            break;
+        }
+
+        parse_lammps_bonds_single_snapshot(&mut lines_iter, &natoms, &mapping_symbols);
+        if let Some(line) = lines_iter.next() {
+            println!("{:?}", line);
+        } else {
+            println!("Warning: missing final blank comment.");
+            break;
+        }
+    }
 
     Ok("Good".to_string())
 }
@@ -461,6 +475,13 @@ fn test_open_file() {
 fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
     let sccs = pg::algo::kosaraju_scc(&graph);
     let mut symbols = vec![];
+
+    let mut counts = HashMap::new();
+    // for x in symbols {
+    //     let c = counts.entry(x).or_insert(0);
+    //     *c += 1;
+    // }
+
     for x in sccs {
         symbols.clear();
         for index in x {
@@ -468,8 +489,13 @@ fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<Stri
             let sym = mapping_symbols.get(n).unwrap();
             symbols.push(sym.as_str());
             let formula = get_reduced_formula(&symbols);
-            println!("{:?}", formula);
+            let c = counts.entry(formula).or_insert(0);
+            *c += 1;
         }
+    }
+
+    for (k, v) in &counts {
+        println!("{} = {}", k, v);
     }
 }
 // 84783441-0f98-4bd5-87a2-44b54dac4b22 ends here
@@ -508,8 +534,6 @@ fn get_filename() -> Result<String, String> {
 
 fn main() {
     let filename = get_filename().unwrap();
-    // read_from_file(filename.as_str());
-    // let r = open_file(filename.as_str());
-    // println!("{:?}", r);
+    parse_lammps_files(&filename);
 }
 // b8ea57f0-b549-4fa0-ac1a-abf83009009e ends here
