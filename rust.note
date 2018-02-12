@@ -5,6 +5,11 @@
 
 * Memo [0/8]
 ** TODO [2018-02-04 Sun] 快被String, str, &str, "str"之间的区别搞死了
+- literal string是静态分配的常量, 和整型, 浮点数一样的语义.
+- String是动态分配的, 可变的字符串. self-owned.
+- &String是对String的只读引用.
+- &str是string slice.
+
 ** [2018-02-04 Sun] rust现在还不支持函数中使用默认参数 [[https://users.rust-lang.org/t/default-values-for-function-parameters/12483/3][URL]]
 ** TODO [2018-02-03 Sat] 如何写一个能接受Iterator类型的函数
 - [[https://stackoverflow.com/questions/43057946/how-do-i-write-a-function-in-rust-that-accepts-any-iterator-whose-item-fulfills][How do I write a function in Rust that accepts any iterator whose Item fulfills a trait?]]
@@ -567,6 +572,368 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
       s.chars().rev().collect::<String>()
   }
 #+end_src
+* reaxa
+** cargo
+#+name: 5d1bf924-1dc8-44e9-9aad-f5bd83176c31
+#+BEGIN_SRC conf :tangle reaxa/Cargo.toml
+  [package]
+  name = "reaxa"
+  version = "0.1.0"
+  authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+  [dependencies]
+  clap = "*"
+#+END_SRC
+
+** src
+:PROPERTIES:
+:header-args: :tangle reaxa/src/main.rs
+:END:
+
+*** globals
+#+name: 68b8f3aa-b3f8-43c0-8b4d-c3165b146535
+#+begin_src rust
+  extern crate clap;
+
+  use std::fs::File;
+  use std::error::Error;
+  use std::io::{self, BufReader};
+  use std::io::prelude::*;
+  use std::collections::HashMap;
+  use std::path::Path;
+
+#+end_src
+*** structs
+#+name: 4cee223f-3139-4cec-a256-ce019e71ec9b
+#+begin_src rust
+  #[derive(Debug, Default, Clone)]
+  struct AtomData{
+      index: usize,
+      symbol: String,
+      neighbors: Vec<usize>,
+      charge: f64,
+  }
+#+end_src
+
+*** functions
+**** outline
+create a terse version of .bonds file
+
+文件名 ==> 数据流 ==> 数据行
+
+简略输出bonds文件中最重要信息
+#+name: 385637c4-7071-4dbb-bf46-c65aef0f3774
+#+begin_src rust
+  fn write_terse_bonds_file_from() {
+      ;
+  }
+#+end_src
+
+**** on file basis
+处理文件级别的逻辑
+#+name: 92cd338c-f795-482a-b1de-6706e8f20058
+#+begin_src rust
+  fn terse_bonds_file_on_line_v0(line: &str) {
+      ;
+  }
+#+end_src
+
+**** on frame basis
+处理轨迹中单一帧
+
+#+name: 77ed312f-a109-44e6-bbe2-c72b3d2761a2
+#+begin_src rust :tangle no
+  use std::iter::Peekable;
+
+  fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I) -> Result<(), String>
+      where I: Iterator<Item=io::Result<String>>,
+  {
+      let mut timestep = 0 as usize;
+      let mut natoms = 0 as usize;
+
+      // 1. read in meta data from comments
+      // expected => Some(Ok("# Timestep 0 "))
+      for n in 0..7 {
+          let line = lines_iter.next().unwrap().unwrap();
+          assert!(line.starts_with("# "), line);
+          match n {
+              0 => {
+                  timestep = get_int_data_from_comment_line(&line, "# Timestep").unwrap();
+                  println!("timestep = {:?}", timestep);
+              },
+              2 => {
+                  natoms = get_int_data_from_comment_line(&line, "# Number of particles").unwrap();
+              },
+              _ => {;}
+          }
+      }
+
+      // 2. read atom data
+      for _ in 0..natoms {
+          if let Some(line) = lines_iter.next() {
+              let line = line.unwrap();
+              let data = get_atom_data_from_line(&line).unwrap();
+
+              // add bonds
+              for i in &data.neighbors {
+                  let n2 = NodeIndex::new(i-1);
+                  gr.update_edge(n1, n2, 1);
+              }
+              // update atom symbol
+              let nw = gr.node_weight_mut(n1).unwrap();
+              ,*nw = data.symbol;
+          } else {
+              let msg = format!("atom data is incomplete\ntimestep = {}", timestep);
+              return Err(msg);
+          }
+      }
+      Ok(())
+  }
+
+#+end_src
+**** on line basis
+处理具体某行数据
+***** 缩略输出
+****** version 0: 保留全部重要信息
+#+name: b8a4e582-82ae-4acf-a8dd-5cad292095e1
+#+begin_src rust
+  fn get_terse_version_from_bonds_data_line(line: &str) {
+      ;
+  }
+
+  #[test]
+  fn test_terse_line_v0() {
+      // test1
+      let s = " 1108 3 1 1107 0 1.479 1.479 2.000 -0.313";
+
+      let new = get_terse_version_from_bonds_data_line(&s);
+
+      // test2
+      let s = " 137 1 9 9 249 257 138 145 153 265 273 129 0 0.450 0.450 0.710 0.410 0.709 0.450 0.450 0.709 0.709 5.047 -1.000 0.025";
+      let new = get_terse_version_from_bonds_data_line(&s);
+  }
+#+end_src
+****** version 1: 保留连接表, 不保留bond order
+#+name: db66fa83-96a3-4315-a379-d4a404ce076f
+#+begin_src rust
+  fn get_terse_line_from_bonds_data_line(line: &str) -> Result<(usize, String), String>{
+      if line.starts_with("# ") {
+          let msg = format!("incorrect line: {}", line);
+          return Err(msg);
+      }
+
+      let mut attrs:Vec<&str> = line.split_whitespace().collect();
+      let cur = attrs[0].parse::<usize>().unwrap();
+      let nbonds = attrs[2].parse::<usize>().unwrap();
+      let neighbors = &attrs[3..3+nbonds];
+
+      // partial charge
+      let charge = &attrs.last().unwrap();
+
+      // using a string to store the result
+      let mut result = format!("{}", charge);
+
+      // 1. keep the neighbor which is larger than current
+      // 2. store the shift relative to current
+      for n in neighbors {
+          let n:usize = n.parse().unwrap();
+          if n > cur {
+              result.push_str(format!(" {}", n - cur).as_str());
+          }
+      }
+
+      Ok((cur, result))
+  }
+
+  #[test]
+  fn test_terse_line_v1() {
+      // test1
+      let s = " 1108 3 1 1107 0 1.479 1.479 2.000 -0.313";
+      let new = get_terse_line_from_bonds_data_line(&s);
+      assert!(new.is_ok());
+      let (cur, result) = new.unwrap();
+      assert!(cur == 1108);
+      assert!(result.starts_with("-0.313"));
+
+      // test2
+      let s = " 137 1 9 9 249 257 138 145 153 265 273 129 0 0.450 0.450 0.710 0.410 0.709 0.450 0.450 0.709 0.709 5.047 -1.000 0.025";
+      let new = get_terse_line_from_bonds_data_line(&s);
+      assert!(new.is_ok());
+      let (cur, result) = new.unwrap();
+      assert!(cur == 137);
+      assert_eq!(result, "0.025 112 120 1 8 16 128 136");
+  }
+
+#+end_src
+
+***** 方便提取注释行中的数据, 比如总原子数等.
+#+name: fbba88ec-5783-4732-a707-55322c79439f
+#+begin_src rust
+  fn get_int_data_from_comment_line(line: &str, prefix: &str) -> Result<usize, String> {
+      if line.starts_with(prefix) {
+          let s = line[prefix.len()..].trim().parse::<usize>();
+          match s {
+              Ok(v) => return Ok(v),
+              Err(why) => return Err(format!("{:?}", why)),
+          }
+      } else {
+          let msg = format!("Failed to get value {} for current frame: {}", prefix, line);
+          Err(msg)
+      }
+  }
+
+  #[test]
+  fn test_get_int_data_from_comment_line() {
+      // get timestep
+      let r = get_int_data_from_comment_line("# Timestep 10", "# Timestep");
+      assert_eq!(r, Ok(10));
+      // get number of atoms
+      let r = get_int_data_from_comment_line("# Number of particles 684", "# Number of particles");
+      assert_eq!(r, Ok(684));
+
+      let r = get_int_data_from_comment_line("# Timestep 0.0", "# Timestep");
+      assert!(r.is_err());
+      let r = get_int_data_from_comment_line("12 22\n", "# Timestep");
+      assert!(r.is_err());
+  }
+#+end_src
+
+***** 解析数据行, 对于某个单一的原子
+#+name: d8bb9606-edb3-4997-a99a-b0b2a65a4c17
+#+begin_src rust
+  // fn get_atom_data_from_line(line: &str) -> Result<(AtomData, &[usize]), String> {
+  fn get_atom_data_from_line(line: &str) -> Result<AtomData, String> {
+      let mut data = AtomData {
+          index: 0,
+          symbol: String::from("1"),
+          charge: 0.,
+          neighbors: vec![],
+      };
+
+      let error = format!("Failed to parse atom data from: {}", line);
+
+      // 1. get index
+      let mut attrs = line.split_whitespace();
+      if let Some(v) = attrs.next() {
+          match v.parse::<usize>() {
+              Ok(v) => {
+                  data.index = v;
+              },
+              Err(why) => {
+                  return Err(format!("{:?}", why));
+              },
+          }
+      } else {
+          return Err(error);
+      }
+
+      // 2. get particle type
+      if let Some(v) = attrs.next() {
+          data.symbol = v.to_string();
+      } else {
+          return Err("failed to read particle type.".to_string());
+      }
+
+      // 3. get number of neighbors
+      let mut nneighbors = 0;
+      if let Some(v) = attrs.next() {
+          match v.parse::<usize>() {
+              Ok(v) => {
+                  nneighbors = v;
+              },
+              Err(why) => {
+                  return Err(format!("{:?}", why));
+              },
+          }
+      } else {
+          return Err("failed to read number of neighbors.".to_string());
+      }
+
+      // 4. get neighbors
+      // let mut neighbors = vec![];
+      for _ in 0..nneighbors {
+          if let Some(v) = attrs.next() {
+              match v.parse::<usize>() {
+                  Ok(v) => {
+                      // neighbors.push(v);
+                      data.neighbors.push(v);
+                  },
+                  Err(why) => {
+                      return Err(format!("{:?}", why));
+                  },
+              }
+          } else {
+              return Err(error);
+          }
+      }
+
+      // 5. get partial charge
+      if let Some(v) = attrs.last() {
+          match v.parse::<f64>() {
+              Ok(v) => data.charge = v,
+              Err(why) => return Err(format!("{:?}", why)),
+          }
+      } else {
+          let msg = format!("failed to get a float value from: {}", line);
+          return Err(msg);
+      }
+
+      Ok(data)
+  }
+
+  #[test]
+  fn test_get_atom_data_from_line() {
+      let line = " 121 3 2 301 28 0         0.978         0.978         1.956         2.000        -0.736 ";
+      let r = get_atom_data_from_line(&line);
+      assert!(r.is_ok());
+      // let (data, _) = r.unwrap();
+      let data = r.unwrap();
+      assert!(data.index == 121);
+      assert!(data.symbol == "3");
+      assert!(data.charge == -0.736);
+  }
+#+end_src
+*** cmdline
+**** main
+提供命令行操作, 读入待分析文件路径.
+#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
+#+BEGIN_SRC rust
+  /// get file name from command line argument
+  fn get_filename() -> Result<String, String> {
+      use clap::{App, Arg, AppSettings};
+
+      let app = App::new("myapp");
+
+      let matches = App::new("MyApp")
+          .version("0.1")
+          .author("Wenping Guo <winpng@gmail.com>")
+          .about("lammps/reaxff reaction trajectory analysis")
+          .arg(
+              Arg::with_name("debug")
+                  .help("debug switch")
+                  .long("debug")
+                  .multiple(true)
+                  .short("d")
+          )
+          .arg(
+              Arg::with_name("input")
+                  .help("set input file name")
+                  .index(1)
+          )
+          .setting(AppSettings::ArgRequiredElseHelp)
+          .get_matches();
+      let r = matches.value_of("input");
+      match r {
+          Some(v) => Ok(v.to_string()),
+          None => Err("bad input".to_string())
+      }
+  }
+
+  fn main() {
+      let filename = get_filename().unwrap();
+      // parse_lammps_files(&filename);
+  }
+#+END_SRC
 
 * reaction
 分析lammps生成的轨迹文件.
@@ -1086,6 +1453,8 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 需要从这里读入不同timestep时对应的构型.
 
 **** tests
+问题: data, bonds, dump这三个文件名不一定相同.
+
 #+name: 2085aabc-b09b-4084-88d1-33699881e5e3
 #+begin_src rust
   fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
@@ -1119,7 +1488,6 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       parse_lammps_files(path);
   }
 #+end_src
-
 *** graph operation
 **** fragments
 #+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
