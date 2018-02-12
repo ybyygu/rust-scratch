@@ -694,26 +694,7 @@ create a terse version of .bonds file
 **** on line basis
 处理具体某行数据
 ***** 缩略输出
-****** version 0: 保留全部重要信息
-#+name: b8a4e582-82ae-4acf-a8dd-5cad292095e1
-#+begin_src rust
-  fn get_terse_version_from_bonds_data_line(line: &str) {
-      ;
-  }
-
-  #[test]
-  fn test_terse_line_v0() {
-      // test1
-      let s = " 1108 3 1 1107 0 1.479 1.479 2.000 -0.313";
-
-      let new = get_terse_version_from_bonds_data_line(&s);
-
-      // test2
-      let s = " 137 1 9 9 249 257 138 145 153 265 273 129 0 0.450 0.450 0.710 0.410 0.709 0.450 0.450 0.709 0.709 5.047 -1.000 0.025";
-      let new = get_terse_version_from_bonds_data_line(&s);
-  }
-#+end_src
-****** version 1: 保留连接表, 不保留bond order
+****** 有陨版: 保留连接表, 不保留bond order
 #+name: db66fa83-96a3-4315-a379-d4a404ce076f
 #+begin_src rust
   fn get_terse_line_from_bonds_data_line(line: &str) -> Result<(usize, String), String>{
@@ -746,7 +727,7 @@ create a terse version of .bonds file
   }
 
   #[test]
-  fn test_terse_line_v1() {
+  fn test_terse_line() {
       // test1
       let s = " 1108 3 1 1107 0 1.479 1.479 2.000 -0.313";
       let new = get_terse_line_from_bonds_data_line(&s);
@@ -764,6 +745,26 @@ create a terse version of .bonds file
       assert_eq!(result, "0.025 112 120 1 8 16 128 136");
   }
 
+#+end_src
+
+****** 无陨版: 保留全部重要信息
+#+name: b8a4e582-82ae-4acf-a8dd-5cad292095e1
+#+begin_src rust :tangle no
+  fn get_terse_line_from_bonds_data_line(line: &str) {
+      ;
+  }
+
+  #[test]
+  fn test_terse_line_v0() {
+      // test1
+      let s = " 1108 3 1 1107 0 1.479 1.479 2.000 -0.313";
+
+      let new = get_terse_version_from_bonds_data_line(&s);
+
+      // test2
+      let s = " 137 1 9 9 249 257 138 145 153 265 273 129 0 0.450 0.450 0.710 0.410 0.709 0.450 0.450 0.709 0.709 5.047 -1.000 0.025";
+      let new = get_terse_version_from_bonds_data_line(&s);
+  }
 #+end_src
 
 ***** 方便提取注释行中的数据, 比如总原子数等.
