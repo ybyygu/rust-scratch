@@ -464,6 +464,7 @@ fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
 }
 
 #[test]
+#[ignore]
 fn test_open_file() {
     let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
     parse_lammps_files(path);

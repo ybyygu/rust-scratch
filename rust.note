@@ -11,15 +11,24 @@
 
 代码标注:
 : #[test]
+或
+: #[test]
+: #[ignore]
+这样测试里会忽略.
 
 测试:
 : cargo test
 
 可以将test代码放到mod里, 以#[cfg(test)]标注, 这样可以减少最终执行文件的大小.
 
+集成测试中的代码适合放练手代码, 不需要写主程序, 不会被编入其它主程序中. 用cargo
+很容易调用:
+: cargo test -- --nocapture
+
 ** TODO [2018-02-04 Sun] 快被String, str, &str, "str"之间的区别搞死了
 - literal string是静态分配的常量, 和整型, 浮点数一样的语义.
-- String是动态分配的, 可变的字符串. self-owned.
+- String是动态分配的, 可变的字符串. self-owned. 函数定义时, 优先用这个, 省掉不少
+  麻烦.
 - &String是对String的只读引用.
 - &str是string slice.
 
@@ -50,7 +59,7 @@ Eq是PartialEq的加强版.
 
 PartialEq不要求自相等. 比如: a可以不等a(以浮点数为例).
 
-** [2018-01-31 Wed] 使用petgraph来操作图论结构
+** [2018-01-31 Wed] 使用petgraph来操作图论结构 [[https://github.com/bluss/petgraph][petgraph]]
 第一印象: 没有networkx的api那么方便.
 
 有三种graph类型.
@@ -142,7 +151,7 @@ log将和slog合并: [[https://github.com/rust-lang-nursery/log/issues/149][Stru
 ** [2017-12-26 Tue] rust基础练习3 基本数据结构
 *** tuple
 : tuples like (1, true)
-- tuple中的数据可以是不同类型的.
+- tuple中的数据通常是不同类型的.
 - 通过tuple, 函数可以返回多个数值.
 
 tuple输出时:
@@ -177,6 +186,9 @@ tuple可以通过位置来指认:
 : let t = ();
 
 函数无返回值时, 默认返回(), 相当于python中的None?
+
+还有一点与python不同. 因为tuple中成员类型不同, 用于loop时没意义. 可以换array来更
+好的实现相应的功能.
 
 *** arrays, slices
 : arrays like [1, 2, 3]
@@ -601,6 +613,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
   }
 #+end_src
 * reaxa
+一个小程序: 将.bonds转换为只保留键连信息的新文件, 以减少原.bonds文件的大小(可删).
+
 ** cargo
 #+name: 5d1bf924-1dc8-44e9-9aad-f5bd83176c31
 #+BEGIN_SRC conf :tangle reaxa/Cargo.toml
@@ -956,7 +970,6 @@ create a terse version of .bonds file
   petgraph = "*"
   clap = "*"
 #+END_SRC
-
 ** src
 :PROPERTIES:
 :header-args: :tangle reaction/src/main.rs
@@ -1490,6 +1503,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 
   #[test]
+  #[ignore]
   fn test_open_file() {
       let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
       parse_lammps_files(path);
@@ -1612,6 +1626,68 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       parse_lammps_files(&filename);
   }
 #+END_SRC
+
+** graph
+:PROPERTIES:
+:header-args: :tangle reaction/src/graph.rs
+:END:
+*** connected components
+petgraph里只能输出connected components的个数, 没有具体每个component的子结构对应
+的信息. 这里手动写一个.
+
+** tests                                                            :ATTACH:
+*** test connected components
+:PROPERTIES:
+:header-args: :tangle reaction/tests/graph.rs
+:ID:       176c677d-c9cb-4f4f-b20e-7e68f6ee680f
+:Attachments: screenshot_2018-02-13_16-59-08.png
+:END:
+
+参考图像:
+#+DOWNLOADED: @ 2018-02-13 16:59:09
+#+caption: CH4和H2O
+#+name: fig:ea828016
+#+attr_org: :width 400
+#+attr_odt: :width 5
+[[file:data/17/6c677d-c9cb-4f4f-b20e-7e68f6ee680f/screenshot_2018-02-13_16-59-08.png]]
+
+#+name: 3ac4ebc7-6b99-4984-8571-f0cc7ab27990
+#+begin_src rust
+  extern crate petgraph;
+
+  use petgraph::prelude::*;
+  use petgraph as pg;
+
+  #[test]
+  fn test_get_connected_components() {
+      let mut graph = Graph::new_undirected();
+
+      // weight
+      let w = 0;
+
+      let mut v = Vec::new();
+
+      // Add 10 vertices to G
+      for i in 0..8 {
+          v.push(graph.add_node(i));
+      }
+
+      // create bonds for CH4
+      for i in 1..5 {
+          println!("{:?}", i);
+          graph.add_edge(v[0], v[i], w);
+      }
+
+      graph.add_edge(v[5], v[6], w);
+      graph.add_edge(v[5], v[7], w);
+
+      let x = [1, 2, 5, 8];
+      for i in x.iter() {
+          println!("{:?}", i);
+      }
+  }
+
+#+end_src
 
 * src
 ** cmdline
