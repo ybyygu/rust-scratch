@@ -136,6 +136,14 @@ struct AtomData{
 }
 // 43366bc0-f1ca-4338-9289-0f637affbfda ends here
 
+// [[file:~/Workspace/Programming/rust-scratch/rust.note::ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb][ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb]]
+// store system information
+struct SystemInfo {
+    natoms: usize,
+    mapping_symbols: HashMap<usize, String>,
+}
+// ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb ends here
+
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::1f4bb42e-6c9c-41d1-b9f3-e0908813187a][1f4bb42e-6c9c-41d1-b9f3-e0908813187a]]
 fn parse_lammps_data_file(file: File,
                           natoms: &mut usize,
@@ -475,24 +483,21 @@ fn test_open_file() {
 // print all connected components
 fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
     let sccs = pg::algo::kosaraju_scc(&graph);
-    let mut symbols = vec![];
 
     let mut counts = HashMap::new();
-    // for x in symbols {
-    //     let c = counts.entry(x).or_insert(0);
-    //     *c += 1;
-    // }
 
+    let mut symbols = vec![];
     for x in sccs {
         symbols.clear();
         for index in x {
             let n = &graph[index];
             let sym = mapping_symbols.get(n).unwrap();
             symbols.push(sym.as_str());
-            let formula = get_reduced_formula(&symbols);
-            let c = counts.entry(formula).or_insert(0);
-            *c += 1;
         }
+        // count formulas
+        let formula = get_reduced_formula(&symbols);
+        let c = counts.entry(formula).or_insert(0);
+        *c += 1;
     }
 
     for (k, v) in &counts {

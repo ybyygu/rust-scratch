@@ -62,6 +62,8 @@ PartialEq不要求自相等. 比如: a可以不等a(以浮点数为例).
 ** [2018-01-31 Wed] 使用petgraph来操作图论结构 [[https://github.com/bluss/petgraph][petgraph]]
 第一印象: 没有networkx的api那么方便.
 
+求connected_components用petgraph::algo::kosaraju_scc即可.
+
 有三种graph类型.
 
 *** Graph
@@ -85,7 +87,7 @@ add_edge时需注意:默认petgraph充许parallel edges, 因此多次添加edge�
 边).
 
 : G.add_node(n);
-其中n用来指示不同的node. 不能设定node data, 或者说n本身就是data(结构体).
+其kosaraju_scc中n用来指示不同的node. 不能设定node data, 或者说n本身就是data(结构体).
 
 : G.add_edge(n1, n2, edge_data);
 添加节点n1和n2之间的边.
@@ -956,13 +958,13 @@ create a terse version of .bonds file
   }
 #+END_SRC
 
-* reaction
+* reaxb
 分析lammps生成的轨迹文件.
 ** cargo
 #+name: d5f68605-90cb-4b2b-b316-2025d935c17b
 #+BEGIN_SRC conf :tangle reaction/Cargo.toml
   [package]
-  name = "reac"
+  name = "reaxb"
   version = "0.1.0"
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
@@ -1134,6 +1136,16 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 #+end_src
 
 *** parse lammps files
+**** base structs
+#+name: ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb
+#+begin_src rust
+  // store system information
+  struct SystemInfo {
+      natoms: usize,
+      mapping_symbols: HashMap<usize, String>,
+  }
+#+end_src
+
 **** data file
 ***** info
 从lammps data输入文件中读入结构信息.
@@ -1469,9 +1481,6 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-**** dump file
-需要从这里读入不同timestep时对应的构型.
-
 **** tests
 问题: data, bonds, dump这三个文件名不一定相同.
 
@@ -1517,72 +1526,26 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   // print all connected components
   fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
       let sccs = pg::algo::kosaraju_scc(&graph);
-      let mut symbols = vec![];
 
       let mut counts = HashMap::new();
-      // for x in symbols {
-      //     let c = counts.entry(x).or_insert(0);
-      //     *c += 1;
-      // }
 
+      let mut symbols = vec![];
       for x in sccs {
           symbols.clear();
           for index in x {
               let n = &graph[index];
               let sym = mapping_symbols.get(n).unwrap();
               symbols.push(sym.as_str());
-              let formula = get_reduced_formula(&symbols);
-              let c = counts.entry(formula).or_insert(0);
-              ,*c += 1;
           }
+          // count formulas
+          let formula = get_reduced_formula(&symbols);
+          let c = counts.entry(formula).or_insert(0);
+          ,*c += 1;
       }
 
       for (k, v) in &counts {
           println!("{} = {}", k, v);
       }
-  }
-#+end_src
-
-**** to delete
-#+name: 643699b0-d380-4f9d-9c74-cdc0149f2fe5
-#+begin_src rust :tangle no
-  fn get_edge_from_line(line: String) -> (String, String, Vec<(String, String)>) {
-      //  301 4 3 289 308 307 0         1.129         1.232         1.231         3.591         0.083         0.362
-      let line = &*line;
-      let mut bonds = Vec::new();
-      let mut attrs = line.split_whitespace();
-      // 1. get the first item
-
-      let current = attrs.nth(0).unwrap();
-      let nsymbol = attrs.next().unwrap();
-
-      if let Some(nb) = attrs.next() {
-          let nb = nb.parse::<usize>().unwrap();
-          for _ in 0..nb {
-              let other = attrs.next().unwrap();
-              bonds.push((current.to_string(), other.to_string()))
-          }
-      }
-      (current.to_string(), nsymbol.to_string(), bonds)
-  }
-#+end_src
-
-构建只有节点的图
-#+name: 3c84b2d2-ba94-4c2d-ab2c-cb7c9737c8af
-#+begin_src rust :tangle no
-  fn build_graph<'a>(natoms: usize) -> UnGraph<&'a AtomData, &'a usize> {
-      let gr = Graph::new_undirected();
-      for i in 0..natoms {
-          let d = AtomData{
-              index: 0,
-              symbol: "0",
-              charge: 0.,
-              neighbors: vec![],
-          };
-          gr.add_node(d);
-      }
-
-      gr
   }
 #+end_src
 
@@ -1655,8 +1618,11 @@ petgraph里只能输出connected components的个数, 没有具体每个componen
 #+begin_src rust
   extern crate petgraph;
 
+  use std::collections::HashSet;
+
   use petgraph::prelude::*;
   use petgraph as pg;
+  use petgraph::graph::node_index as n;
 
   #[test]
   fn test_get_connected_components() {
@@ -1667,24 +1633,38 @@ petgraph里只能输出connected components的个数, 没有具体每个componen
 
       let mut v = Vec::new();
 
-      // Add 10 vertices to G
+      // Add 8 vertices to G
       for i in 0..8 {
           v.push(graph.add_node(i));
       }
 
       // create bonds for CH4
       for i in 1..5 {
-          println!("{:?}", i);
           graph.add_edge(v[0], v[i], w);
       }
 
       graph.add_edge(v[5], v[6], w);
       graph.add_edge(v[5], v[7], w);
 
-      let x = [1, 2, 5, 8];
-      for i in x.iter() {
-          println!("{:?}", i);
+      let ncc = pg::algo::connected_components(&graph);
+      assert_eq!(2, ncc);
+
+      for x in pg::algo::kosaraju_scc(&graph) {
+          println!("{:?}", x);
       }
+
+      // store connected components
+      let mut ccs1 = HashSet::new();
+      ccs1.insert(v[0]);
+      ccs1.insert(v[1]);
+      ccs1.insert(v[2]);
+      ccs1.insert(v[3]);
+      ccs1.insert(v[4]);
+
+      let mut ccs2 = HashSet::new();
+      ccs2.insert(v[5]);
+      ccs2.insert(v[6]);
+      ccs2.insert(v[7]);
   }
 
 #+end_src
