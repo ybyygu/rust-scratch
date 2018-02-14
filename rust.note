@@ -616,7 +616,6 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 #+end_src
 * reaxa
 一个小程序: 将.bonds转换为只保留键连信息的新文件, 以减少原.bonds文件的大小(可删).
-
 ** cargo
 #+name: 5d1bf924-1dc8-44e9-9aad-f5bd83176c31
 #+BEGIN_SRC conf :tangle reaxa/Cargo.toml
@@ -920,7 +919,7 @@ create a terse version of .bonds file
       let app = App::new("reaxa");
 
       let matches = App::new("reaxa")
-          .version("0.0.2")
+          .version("0.1.0")
           .author("Wenping Guo <winpng@gmail.com>")
           .about("a tool for analysis of lammps/reaxff reaction trajectory")
           .arg(
@@ -959,10 +958,10 @@ create a terse version of .bonds file
 #+END_SRC
 
 * reaxb
-分析lammps生成的轨迹文件.
+分析reaxa生成的轨迹文件.
 ** cargo
 #+name: d5f68605-90cb-4b2b-b316-2025d935c17b
-#+BEGIN_SRC conf :tangle reaction/Cargo.toml
+#+BEGIN_SRC conf :tangle reaxb/Cargo.toml
   [package]
   name = "reaxb"
   version = "0.1.0"
@@ -972,14 +971,18 @@ create a terse version of .bonds file
   petgraph = "*"
   clap = "*"
 #+END_SRC
+
 ** src
+*** main.rs
 :PROPERTIES:
-:header-args: :tangle reaction/src/main.rs
+:header-args: :tangle reaxb/src/main.rs
 :END:
-*** globals
+
+这里只放与命令行交互有关的代码.
+**** globals
 #+name: 68b8f3aa-b3f8-43c0-8b4d-c3165b146535
 #+begin_src rust
-  extern crate petgraph;
+  extern crate reaxb;
   extern crate clap;
 
   use std::fs::File;
@@ -989,19 +992,87 @@ create a terse version of .bonds file
   use std::collections::HashMap;
   use std::path::Path;
 
-  use petgraph::prelude::*;
-  use petgraph as pg;
+  use clap::{App, Arg, AppSettings};
+  use reaxb::parse_lammps_files;
 #+end_src
 
-*** atoms
-**** guess element from masses
-LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接读Masses部分中相
-应的注释吧.
+**** main
+提供命令行操作, 读入待分析文件路径.
+#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
+#+BEGIN_SRC rust
+  /// get file name from command line argument
+  fn get_filename() -> Result<String, String> {
 
-#+name: 66a225cc-1a72-4cb5-9dd1-94653871beba
-#+begin_src rust :tangle no
-  fn guess_element_from_mass(mass: f32) {
-      ;
+      let app = App::new("myapp");
+
+      let matches = App::new("MyApp")
+          .version("0.1")
+          .author("Wenping Guo <winpng@gmail.com>")
+          .about("lammps/reaxff reaction trajectory analysis")
+          .arg(
+              Arg::with_name("debug")
+                  .help("debug switch")
+                  .long("debug")
+                  .multiple(true)
+                  .short("d")
+          )
+          .arg(
+              Arg::with_name("input")
+                  .help("set input file name")
+                  .index(1)
+          )
+          .setting(AppSettings::ArgRequiredElseHelp)
+          .get_matches();
+      let r = matches.value_of("input");
+      match r {
+          Some(v) => Ok(v.to_string()),
+          None => Err("bad input".to_string())
+      }
+  }
+
+  fn main() {
+      let filename = get_filename().unwrap();
+      parse_lammps_files(&filename);
+  }
+#+END_SRC
+
+*** lib.rs
+:PROPERTIES:
+:header-args: :tangle reaxb/src/lib.rs
+:END:
+这里定义其它模块化的功能代码. 相当于python中的__init__.py?
+**** globals
+#+name: 68b8f3aa-b3f8-43c0-8b4d-c3165b146535
+#+begin_src rust
+  extern crate petgraph;
+
+  mod atoms;
+  mod graph;
+  mod lammps;
+
+  pub use lammps::parse_lammps_files;
+#+end_src
+
+*** atoms.rs
+:PROPERTIES:
+:header-args: :tangle reaxb/src/atoms.rs
+:END:
+**** globals
+#+name: 8da0ca06-6b0c-4d1b-8eec-827c7459cf2b
+#+begin_src rust
+  use std::collections::HashMap;
+#+end_src
+
+**** atom data
+定义与Atom相关的元信息
+#+name: 43366bc0-f1ca-4338-9289-0f637affbfda
+#+begin_src rust
+  #[derive(Debug, Default, Clone)]
+  pub struct AtomData{
+      pub index: usize,
+      pub symbol: String,
+      pub neighbors: Vec<usize>,
+      pub charge: f64,
   }
 #+end_src
 
@@ -1072,12 +1143,13 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-**** 实现从元素符号列表到分子式.
+**** from symbols to formula
+实现从元素符号列表到分子式.
 #+name: 27fa4abe-d98c-4dd4-8695-e4b4f807cabc
 #+begin_src rust
   // it is better to use generics function,
   // but it is really difficult for me now
-  fn get_reduced_formula(symbols: &[&str]) -> String {
+  pub fn get_reduced_formula(symbols: &[&str]) -> String {
       // 1. count symbols: CCCC ==> C 4
       let mut counts = HashMap::new();
       for x in symbols {
@@ -1122,20 +1194,85 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-**** atom data
-定义与Atom相关的元信息
-#+name: 43366bc0-f1ca-4338-9289-0f637affbfda
-#+begin_src rust
-  #[derive(Debug, Default, Clone)]
-  struct AtomData{
-      index: usize,
-      symbol: String,
-      neighbors: Vec<usize>,
-      charge: f64,
+**** guess element from masses
+LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接读Masses部分中相
+应的注释吧.
+
+#+name: 66a225cc-1a72-4cb5-9dd1-94653871beba
+#+begin_src rust :tangle no
+  fn guess_element_from_mass(mass: f32) {
+      ;
   }
 #+end_src
 
-*** parse lammps files
+*** graph.rs
+:PROPERTIES:
+:header-args: :tangle reaxb/src/graph.rs
+:END:
+**** globals
+#+name: 8da0ca06-6b0c-4d1b-8eec-827c7459cf2b
+#+begin_src rust
+  use std::collections::HashMap;
+
+  use petgraph::prelude::*;
+  use petgraph as pg;
+
+  use atoms::get_reduced_formula;
+#+end_src
+
+**** fragments
+#+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
+#+begin_src rust
+  // print all connected components
+  pub fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
+      let sccs = pg::algo::kosaraju_scc(&graph);
+
+      let mut counts = HashMap::new();
+
+      let mut symbols = vec![];
+      for x in sccs {
+          symbols.clear();
+          for index in x {
+              let n = &graph[index];
+              let sym = mapping_symbols.get(n).unwrap();
+              symbols.push(sym.as_str());
+          }
+          // count formulas
+          let formula = get_reduced_formula(&symbols);
+          let c = counts.entry(formula).or_insert(0);
+          ,*c += 1;
+      }
+
+      for (k, v) in &counts {
+          println!("{} = {}", k, v);
+      }
+  }
+#+end_src
+
+**** connected components
+
+*** lammps.rs
+:PROPERTIES:
+:header-args: :tangle reaxb/src/lammps.rs
+:END:
+parse lammps files
+**** globals
+#+name: 8da0ca06-6b0c-4d1b-8eec-827c7459cf2b
+#+begin_src rust
+  use std::fs::File;
+  use std::error::Error;
+  use std::io::{self, BufReader};
+  use std::io::prelude::*;
+  use std::collections::HashMap;
+  use std::path::Path;
+
+  use petgraph::prelude::*;
+  use petgraph as pg;
+
+  use atoms::AtomData;
+  use graph::show_fragments;
+#+end_src
+
 **** base structs
 #+name: ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb
 #+begin_src rust
@@ -1268,7 +1405,6 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 
 注意: 该文件中的给出的原子类型可能与data文件不同(测试文件的问题?). 应以data文件
 中的为准.
-
 ***** parse .bonds file
 读入bonds文件
 #+name: ae4768b5-576f-461b-8186-7bb8b589216b
@@ -1300,9 +1436,9 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-***** parse a single snapshot
+****** parse a single snapshot
 读入单个snapshot
-****** 各个小的功能块, 方便测试.
+******* 各个小的功能块, 方便测试.
 #+name: 772f2307-4bde-47b4-b839-435dabaf5f1a
 #+begin_src rust
   fn get_int_data_from_comment_line(line: &str, prefix: &str) -> Result<usize, String> {
@@ -1415,7 +1551,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 
 #+end_src
 
-****** 最外层控制.
+******* 最外层控制.
 #+name: a0057eaf-1b2f-4b5d-a261-5e44f026a915
 #+begin_src rust
   use std::iter::Peekable;
@@ -1481,12 +1617,12 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-**** tests
+***** tests
 问题: data, bonds, dump这三个文件名不一定相同.
 
 #+name: 2085aabc-b09b-4084-88d1-33699881e5e3
 #+begin_src rust
-  fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
+  pub fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
       // 1. guess required lammps files from input filename
       let path = Path::new(filename);
       let path_lammps_data = path.with_extension("data");
@@ -1519,89 +1655,11 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   }
 #+end_src
 
-*** graph operation
-**** fragments
-#+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
-#+begin_src rust
-  // print all connected components
-  fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
-      let sccs = pg::algo::kosaraju_scc(&graph);
-
-      let mut counts = HashMap::new();
-
-      let mut symbols = vec![];
-      for x in sccs {
-          symbols.clear();
-          for index in x {
-              let n = &graph[index];
-              let sym = mapping_symbols.get(n).unwrap();
-              symbols.push(sym.as_str());
-          }
-          // count formulas
-          let formula = get_reduced_formula(&symbols);
-          let c = counts.entry(formula).or_insert(0);
-          ,*c += 1;
-      }
-
-      for (k, v) in &counts {
-          println!("{} = {}", k, v);
-      }
-  }
-#+end_src
-
-*** main
-提供命令行操作, 读入待分析文件路径.
-#+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
-#+BEGIN_SRC rust
-  /// get file name from command line argument
-  fn get_filename() -> Result<String, String> {
-      use clap::{App, Arg, AppSettings};
-
-      let app = App::new("myapp");
-
-      let matches = App::new("MyApp")
-          .version("0.1")
-          .author("Wenping Guo <winpng@gmail.com>")
-          .about("lammps/reaxff reaction trajectory analysis")
-          .arg(
-              Arg::with_name("debug")
-                  .help("debug switch")
-                  .long("debug")
-                  .multiple(true)
-                  .short("d")
-          )
-          .arg(
-              Arg::with_name("input")
-                  .help("set input file name")
-                  .index(1)
-          )
-          .setting(AppSettings::ArgRequiredElseHelp)
-          .get_matches();
-      let r = matches.value_of("input");
-      match r {
-          Some(v) => Ok(v.to_string()),
-          None => Err("bad input".to_string())
-      }
-  }
-
-  fn main() {
-      let filename = get_filename().unwrap();
-      parse_lammps_files(&filename);
-  }
-#+END_SRC
-
-** graph
-:PROPERTIES:
-:header-args: :tangle reaction/src/graph.rs
-:END:
-*** connected components
-petgraph里只能输出connected components的个数, 没有具体每个component的子结构对应
-的信息. 这里手动写一个.
-
 ** tests                                                            :ATTACH:
-*** test connected components
+这个目录下的代码用于集成测试.
+*** test_graph.rs
 :PROPERTIES:
-:header-args: :tangle reaction/tests/graph.rs
+:header-args: :tangle reaxb/tests/test_graph.rs
 :ID:       176c677d-c9cb-4f4f-b20e-7e68f6ee680f
 :Attachments: screenshot_2018-02-13_16-59-08.png
 :END:
