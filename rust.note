@@ -1032,7 +1032,7 @@ create a terse version of .bonds file
 
   fn main() {
       let filename = get_filename().unwrap();
-      parse_lammps_files(&filename);
+      let frames = parse_lammps_files(&filename);
   }
 #+END_SRC
 
@@ -1050,7 +1050,28 @@ create a terse version of .bonds file
   mod graph;
   mod lammps;
 
+  use std::collections::HashMap;
   pub use lammps::parse_lammps_files;
+#+end_src
+
+**** structs
+#+name: 593685c3-b67d-43c2-95f8-c9fc86f6c5f8
+#+begin_src rust
+  pub struct Frame {
+      pub timestep: usize,
+      pub fragments: HashMap<String, usize>,
+  }
+
+  impl Frame {
+      pub fn new() -> Frame{
+          let map:HashMap<String, usize> = HashMap::new();
+
+          Frame {
+              timestep:0,
+              fragments: map
+          }
+      }
+  }
 #+end_src
 
 *** atoms.rs
@@ -1073,6 +1094,23 @@ create a terse version of .bonds file
       pub symbol: String,
       pub neighbors: Vec<usize>,
       pub charge: f64,
+  }
+#+end_src
+
+定义生成函数, 方便使用.
+#+name: 455910f5-3d04-48b0-a9cc-a46516ba6c1c
+#+begin_src rust
+  impl AtomData {
+      pub fn new() -> AtomData {
+          let ns:Vec<usize> = Vec::new();
+
+          AtomData {
+              index: 0,
+              charge: 0.0,
+              symbol: "H".to_string(),
+              neighbors: ns,
+          }
+      }
   }
 #+end_src
 
@@ -1218,23 +1256,38 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
   use petgraph as pg;
 
   use atoms::get_reduced_formula;
+  use atoms::AtomData;
 #+end_src
 
 **** fragments
-#+name: 84783441-0f98-4bd5-87a2-44b54dac4b22
+#+name: 080d17e9-5876-4808-8e5a-a181129da4fd
 #+begin_src rust
-  // print all connected components
-  pub fn show_fragments(graph: &UnGraph<String, usize>, mapping_symbols: &HashMap<String, String>) {
+  pub fn fragments_from_atoms(atoms: &Vec<AtomData>) -> HashMap<String, usize>
+  {
+      let mut graph = Graph::new_undirected();
+
+      // add nodes
+      for d in atoms {
+          graph.add_node(&d.symbol);
+      }
+
+      // update edges
+      for d in atoms {
+          let icurrent = NodeIndex::new(&d.index-1);
+          for x in &d.neighbors {
+              let iother = NodeIndex::new(x - 1);
+              graph.update_edge(icurrent, iother, 1);
+          }
+      }
+
+      // get fragments from connected components
       let sccs = pg::algo::kosaraju_scc(&graph);
-
       let mut counts = HashMap::new();
-
       let mut symbols = vec![];
       for x in sccs {
           symbols.clear();
           for index in x {
-              let n = &graph[index];
-              let sym = mapping_symbols.get(n).unwrap();
+              let sym = &graph[index];
               symbols.push(sym.as_str());
           }
           // count formulas
@@ -1243,13 +1296,9 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
           ,*c += 1;
       }
 
-      for (k, v) in &counts {
-          println!("{} = {}", k, v);
-      }
+      counts
   }
 #+end_src
-
-**** connected components
 
 *** lammps.rs
 :PROPERTIES:
@@ -1270,7 +1319,8 @@ parse lammps files
   use petgraph as pg;
 
   use atoms::AtomData;
-  use graph::show_fragments;
+  use ::Frame;
+  use graph::fragments_from_atoms;
 #+end_src
 
 **** base structs
@@ -1280,6 +1330,36 @@ parse lammps files
   struct SystemInfo {
       natoms: usize,
       mapping_symbols: HashMap<usize, String>,
+  }
+#+end_src
+
+**** parse lammps files
+读入多个lammps文件.
+
+问题: data, bonds, dump这三个文件名不一定相同.
+
+#+name: 2085aabc-b09b-4084-88d1-33699881e5e3
+#+begin_src rust
+  pub fn parse_lammps_files(filename: &str) -> Result<Vec<Frame>, Box<Error>> {
+      // 1. guess required lammps files from input filename
+      let path = Path::new(filename);
+      let path_lammps_data = path.with_extension("data");
+      let path_lammps_bonds = path.with_extension("bonds-terse");
+
+      assert!(path_lammps_data.is_file());
+      assert!(path_lammps_bonds.is_file());
+
+      let f = File::open(path_lammps_data)?;
+
+      // read number of atoms and atom symbols from .data file
+      let mut natoms = 0;
+      let mut mapping_symbols: HashMap<String, String> = HashMap::new();
+      parse_lammps_data_file(f, &mut natoms, &mut mapping_symbols);
+
+      // read bonds from .bonds file
+      let filename = path_lammps_bonds.to_str().unwrap();
+
+      parse_terse_bonds_file(&filename, &mapping_symbols)
   }
 #+end_src
 
@@ -1405,10 +1485,10 @@ parse lammps files
 
 注意: 该文件中的给出的原子类型可能与data文件不同(测试文件的问题?). 应以data文件
 中的为准.
-***** parse .bonds file
+***** on file basis
 读入bonds文件
 #+name: ae4768b5-576f-461b-8186-7bb8b589216b
-#+begin_src rust
+#+begin_src rust :tangle no
   fn parse_lammps_bonds_file(file: File,
                              natoms: &usize,
                              mapping_symbols: &HashMap<String, String>)
@@ -1436,9 +1516,9 @@ parse lammps files
   }
 #+end_src
 
-****** parse a single snapshot
+***** on frame basis
 读入单个snapshot
-******* 各个小的功能块, 方便测试.
+****** 各个小的功能块, 方便测试.
 #+name: 772f2307-4bde-47b4-b839-435dabaf5f1a
 #+begin_src rust
   fn get_int_data_from_comment_line(line: &str, prefix: &str) -> Result<usize, String> {
@@ -1551,9 +1631,9 @@ parse lammps files
 
 #+end_src
 
-******* 最外层控制.
+****** 最外层控制.
 #+name: a0057eaf-1b2f-4b5d-a261-5e44f026a915
-#+begin_src rust
+#+begin_src rust :tangle no
   use std::iter::Peekable;
 
   fn parse_lammps_bonds_single_snapshot<I>(lines_iter: &mut I,
@@ -1617,41 +1697,126 @@ parse lammps files
   }
 #+end_src
 
-***** tests
-问题: data, bonds, dump这三个文件名不一定相同.
-
-#+name: 2085aabc-b09b-4084-88d1-33699881e5e3
+**** simplified bonds file
+解释reaxa生成的精减版文件.
+***** on file basis
+#+name: 1cb4fcf1-d093-41ce-a011-f88a95c9bf7b
 #+begin_src rust
-  pub fn parse_lammps_files(filename: &str) -> Result<String, io::Error> {
-      // 1. guess required lammps files from input filename
-      let path = Path::new(filename);
-      let path_lammps_data = path.with_extension("data");
-      let path_lammps_bonds = path.with_extension("bonds");
-      let path_lammps_dump = path.with_extension("dump");
+  fn parse_terse_bonds_file (
+      filename: &str,
+      mapping_symbols: &HashMap<String, String>)
+      -> Result<Vec<Frame>, Box<Error>>
+  {
+      // create file handler and a buffle reader
+      let fp = File::open(filename)?;
+      let mut reader = BufReader::new(fp);
+      let mut lines_iter = reader.lines().peekable();
 
-      assert!(path_lammps_data.is_file());
-      assert!(path_lammps_bonds.is_file());
-
-      // Open the path in read-only mode, returns `io::Result<File>`
-      let f = File::open(path_lammps_data)?;
-
+      // parse data
+      let mut timestep = 0;
       let mut natoms = 0;
-      let mut mapping_symbols: HashMap<String, String> = HashMap::new();
-      // read number of atoms and atom symbols from .data file
-      parse_lammps_data_file(f, &mut natoms, &mut mapping_symbols);
+      let mut frames = Vec::new();
+      loop {
+          if lines_iter.peek().is_none() {
+              eprintln!("reached the end of the file.");
+              break;
+          }
+          // process a single frame
+          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter)?;
+          frames.push(frame);
+          break;
+      }
 
-      // read bonds from .bonds file
-      let f = File::open(path_lammps_bonds)?;
-      parse_lammps_bonds_file(f, &natoms, &mapping_symbols);
-
-      Ok("Good".to_string())
+      Ok(frames)
   }
+#+end_src
 
+***** on frame basis
+读入不同原子对应的电荷及connectivity.
+简化版中:
+- 以行数来定原子index.
+- 第一列为浮点数, 对应partial charge
+- 其后几列为与当前原子直接成键的所有原子对应的编号数据. 该数据为键连原子编号与当
+  前原子编号之差, 即index - current
+
+#+name: 5f005858-636b-4d77-aca5-e6be1baca10a
+#+begin_src rust
+  fn parse_terse_bonds_file_single_frame<I>(lines_iter: &mut I) -> Result<Frame, Box<Error>>
+      where I: Iterator<Item=io::Result<String>>,
+  {
+      // 1. read current timestep
+      let mut timestep = 0;
+      let label = "# Timestep";
+      if let Some(line) = lines_iter.next() {
+          let line = line?;
+          timestep = get_int_data_from_comment_line(&line, &label)?;
+      } else {
+          Err("Failed to read timestep!")?;
+      }
+
+      // 2. read number of atoms
+      let mut natoms = 0;
+          let label = "# Number of particles";
+      if let Some(line) = lines_iter.next() {
+          let line = line?;
+          natoms = get_int_data_from_comment_line(&line, &label)?;
+      } else {
+          Err("Failed to read number of atoms!")?;
+      }
+
+      // 3. read connectivity for each atom
+      let mut atoms = Vec::new();
+      assert!(natoms > 0);
+      for n in 1..natoms+1 {
+          let mut data = AtomData::new();
+          if let Some(line) = lines_iter.next() {
+              let line = line?;
+              let (charge, neighbors) = parse_terse_bonds_file_single_line(&line);
+              data.index = n;
+              data.charge = charge;
+              for x in neighbors {
+                  data.neighbors.push(x+n);
+              }
+              atoms.push(data);
+          } else {
+              Err("Atom data is incomplete.")?;
+          }
+      }
+
+      assert!(atoms.len() == natoms);
+
+      // 4. create frame
+      let mut frame = Frame::new();
+      frame.timestep = timestep;
+      let fragments = fragments_from_atoms(&atoms);
+      frame.fragments = fragments;
+
+      Ok(frame)
+  }
+#+end_src
+
+***** on line basis
+#+name: 39637608-12b2-4724-ac38-cfc5d4f9c990
+#+begin_src rust
+  fn parse_terse_bonds_file_single_line(line: &str) -> (f64, Vec<usize>) {
+      let mut attrs = line.split_whitespace();
+      let first = attrs.nth(0).unwrap();
+      let charge:f64 = first.parse().unwrap();
+      let neighbors:Vec<usize> = attrs.map(|x| x.parse::<usize>().unwrap()).collect();
+
+      (charge, neighbors)
+  }
+#+end_src
+
+#+name: b0d25b51-fbb3-460a-882f-3cdb7c6f6619
+#+begin_src rust
   #[test]
-  #[ignore]
-  fn test_open_file() {
-      let path = "/home/ybyygu/Workspace/Projects/structure-prediction/data/e2/789648-d084-401b-a67e-e9628a29ca12/测试文件/V2O5_010_MeOH_rand_nvt_650_20.bonds";
-      parse_lammps_files(path);
+  fn test_parse_terse_bonds_line() {
+      let s = "0.007 8 9 16 896 1017 1016 905 904 120 121 1 112 128";
+      let (charge, neighbors) = parse_terse_bonds_file_single_line(&s);
+      assert_eq!(0.007, charge);
+      assert_eq!(13, neighbors.len());
+      assert_eq!(8, neighbors[0]);
   }
 #+end_src
 
