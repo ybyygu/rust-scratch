@@ -4,6 +4,21 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [1/9]
+** [2018-02-16 Fri] peek的用法
+很容易报错:
+: cannot move out of borrowed content
+
+正确的写法:
+#+name: 3be15f32-d8d6-4da9-be88-d0076cf849cb
+#+begin_src rust
+  lines_iter = fp.lines().peekable();
+  if let Some(&Ok(ref firstline)) = lines_iter.peek() {
+      if ! firstline.starts_with("LAMMPS data file") {
+      }
+      ...
+  }
+#+end_src
+
 ** TODO [2018-02-13 Tue] rust测试工具
 测试分为集成测试和单元测试. 单元测试是开发者站在内部的角度来写, 测试代码和功能代
 码放在一起, 可以自由访问任意变量和函数. 集成测试是站在外部使用者的角度来写的, 测
@@ -1359,7 +1374,8 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       // read number of atoms and atom symbols from .data file
       let mut natoms = 0;
       let mut mapping_symbols: HashMap<String, String> = HashMap::new();
-      parse_lammps_data_file(f, &mut natoms, &mut mapping_symbols);
+      // let filename = path_lammps_data.to_str().unwrap();
+      // parse_lammps_data_file(&filename);
 
       // read bonds from .bonds file
       let filename = path_lammps_bonds.to_str().unwrap();
@@ -1382,15 +1398,31 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 3. 原子数型编号与元素的对应关系.
 4. 体系中所有的原子, 元素, 坐标等.
 
-***** TODO src
-关键信息: 所有原子对应的元素类型.
+***** src
+- 关键信息: 所有原子对应的元素类型.
+- 数据类型选择HashMap, key为index, value为AtomData
 
 #+name: 1f4bb42e-6c9c-41d1-b9f3-e0908813187a
 #+begin_src rust
-  fn parse_lammps_data_file(file: File) -> Result<Vec<Atom>, Box<Error>>
+  /// read data from lammps .data file
+  fn parse_lammps_data_file(filename: &str) -> Result<HashMap<usize, AtomData>, Box<Error>>
   {
-      let mut reader = BufReader::new(file);
+      eprintln!("reading data file: {}", &filename);
+
+      let fp = File::open(filename)?;
+      let mut reader = BufReader::new(fp);
       let mut lines_iter = reader.lines().peekable();
+
+      // sanity check
+      if let Some(&Ok(ref firstline)) = lines_iter.peek() {
+          if ! firstline.starts_with("LAMMPS data file") {
+              let msg = format!("read in a wrong file: {}", firstline);
+              Err(msg)?;
+          }
+      } else {
+          let msg = format!("Expect more lines: {}", &filename);
+          Err(msg)?;
+      }
 
       // skip the first two lines
       for _ in 0..2 {
@@ -1399,16 +1431,19 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 
       // 1. read number of total atoms
       // 684  atoms
-      let nresult = lines_iter.next();
-      println!("{:?}", nresult);
-      if let Some(line) = nresult {
-          // pick out plain string, propagate IO error if any
+      let mut natoms = 0;
+      if let Some(line) = lines_iter.next() {
           let line = line?;
           assert!(line.contains(" atoms"), format!("cannot find number of atoms: {}", line));
-          let v: Vec<_> = line.split_whitespace().collect();
-          ,*natoms = v[0].parse().unwrap();
+          let mut attrs = line.split_whitespace();
+          if let Some(s) = attrs.nth(0) {
+              natoms = s.parse().unwrap();
+          } else {
+              let msg = format!("failed to get natoms: {}", line);
+              Err(msg)?;
+          }
       } else {
-          eprintln!("{:?}", nresult);
+          Err("data file is incomplete: failed to get natoms!")?;
       }
 
       // 2. read in number of atom types
@@ -1416,7 +1451,6 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       loop {
           if let Some(line) = lines_iter.next() {
               let line = line?;
-              println!("{:?}", line);
               if line.ends_with("atom types") {
                   if let Some(n) = line.split_whitespace().nth(0) {
                       natom_types = n.parse().unwrap();
@@ -1424,62 +1458,80 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
                   break;
               }
           } else {
-              panic!("cannot find atom types lines in lammps data file");
+              Err("cannot find atom types lines in lammps data file")?;
           }
       }
 
       // 3. parse atom types
-      // 3.0 jump to Masses section
+      // NOTE: element symbol is supposed to be after `#`
+      //     1  50.941500   # V
+      assert!(natom_types > 0);
+      let mut mapping_symbols = HashMap::new();
       loop {
           if let Some(line) = lines_iter.next() {
               let line = line?;
               if line.starts_with("Masses") {
+                  // skip one blank line
+                  lines_iter.next();
+                  // mapping: atom_index ==> atom_symbol
+                  for _ in 0..natom_types {
+                      if let Some(line) = lines_iter.next() {
+                          let line = line?;
+                          let mut attrs = line.split_whitespace();
+                          let k = attrs.nth(0).unwrap();
+                          let v = attrs.last().unwrap();
+                          mapping_symbols.insert(k.to_string(), v.to_string());
+                      }
+                  }
                   break;
               }
-          }
-      }
-      // 3.1 read in atom type maping
-      // NOTE: element symbol is supposed to be after `#`
-      //     1  50.941500   # V
-      // skip one blank line
-      assert!(natom_types > 0);
-      lines_iter.next();
-
-      // mapping: atom_index ==> atom_symbol
-      for _ in 0..natom_types {
-          if let Some(line) = lines_iter.next() {
-              let line = line.unwrap();
-              let mut attrs = line.split_whitespace();
-              let k = attrs.nth(0).unwrap();
-              let v = attrs.last().unwrap();
-              mapping_symbols.insert(k.to_string(), v.to_string());
+          } else {
+              Err("failed to read Masses section")?;
           }
       }
 
-      // 3. jump to Atom section
+      // 4. read in atom index and atom type
+      assert!(natoms > 0);
+
+      let mut atoms = HashMap::new();
       loop {
           if let Some(line) = lines_iter.next() {
               let line = line?;
               if line.starts_with("Atom") {
+                  // skip one blank line
+                  lines_iter.next();
+                  for _ in 0..natoms {
+                      let mut data = AtomData::new();
+                      if let Some(line) = lines_iter.next() {
+                          let line = line?;
+                          let mut attrs = line.split_whitespace();
+                          let index = attrs.next().unwrap();
+                          let t = attrs.next().unwrap();
+                          data.index = index.parse().unwrap();
+                          data.symbol = mapping_symbols.get(t).unwrap().to_string();
+                          atoms.insert(data.index, data);
+                      } else {
+                          Err("Atom records are incomplete.")?;
+                      }
+                  }
                   break;
               }
           } else {
-              panic!("cannot find Atom lines in lammps data file");
-          }
-      }
-      // skip one blank line
-      lines_iter.next();
-      // 4. read in atom index and atom type
-      assert!(*natoms > 0);
-      for _ in 0..*natoms {
-          if let Some(line) = lines_iter.next() {
-              let line = line?;
-          } else {
-              Err("Atom records are incomplete.")?;
+              Err("cannot find Atom lines in lammps data file")?;
           }
       }
 
-      Ok(())
+      Ok(atoms)
+  }
+#+end_src
+
+***** test
+#+name: 52bb7570-33ac-44ae-950b-c7d67d597e76
+#+begin_src rust
+  #[test]
+  fn test_parse_data_file() {
+      let filename = "/home/ybyygu/Incoming/FeC reaxff tests/FeCO/terse-tests/test.data";
+      parse_lammps_data_file(&filename);
   }
 #+end_src
 
