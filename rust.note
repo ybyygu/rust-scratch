@@ -1304,7 +1304,12 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 :PROPERTIES:
 :header-args: :tangle reaxb/src/lammps.rs
 :END:
-parse lammps files
+总体思路:
+- 从data文件中读入总原子数, 原子对应的原子类型(元素符号)
+- 从简化的bonds文件中读入某帧时的timestep, 键链关系.
+- 使用图论来分析某帧时的fragments(connected components), 某fragments的个数.
+- 等所有轨迹解析完成, 输出总表: timestep vs fragments (counts)
+
 **** globals
 #+name: 8da0ca06-6b0c-4d1b-8eec-827c7459cf2b
 #+begin_src rust
@@ -1378,14 +1383,11 @@ parse lammps files
 4. 体系中所有的原子, 元素, 坐标等.
 
 ***** TODO src
-现在太长了, 可以分解成多个更小的功能单元.
+关键信息: 所有原子对应的元素类型.
 
 #+name: 1f4bb42e-6c9c-41d1-b9f3-e0908813187a
 #+begin_src rust
-  fn parse_lammps_data_file(file: File,
-                            natoms: &mut usize,
-                            mapping_symbols: &mut HashMap<String, String>)
-                            -> Result<String, io::Error>
+  fn parse_lammps_data_file(file: File) -> Result<Vec<Atom>, Box<Error>>
   {
       let mut reader = BufReader::new(file);
       let mut lines_iter = reader.lines().peekable();
@@ -1394,6 +1396,7 @@ parse lammps files
       for _ in 0..2 {
           lines_iter.next();
       }
+
       // 1. read number of total atoms
       // 684  atoms
       let nresult = lines_iter.next();
@@ -1471,12 +1474,12 @@ parse lammps files
       for _ in 0..*natoms {
           if let Some(line) = lines_iter.next() {
               let line = line?;
-              // println!("{}", line);
           } else {
-              panic!("Atom records are incomplete.");
+              Err("Atom records are incomplete.")?;
           }
       }
-      Ok("G".to_string())
+
+      Ok(())
   }
 #+end_src
 
@@ -1722,7 +1725,7 @@ parse lammps files
               break;
           }
           // process a single frame
-          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter)?;
+          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter, &mapping_symbols)?;
           frames.push(frame);
           break;
       }
@@ -1741,7 +1744,9 @@ parse lammps files
 
 #+name: 5f005858-636b-4d77-aca5-e6be1baca10a
 #+begin_src rust
-  fn parse_terse_bonds_file_single_frame<I>(lines_iter: &mut I) -> Result<Frame, Box<Error>>
+  fn parse_terse_bonds_file_single_frame<I> (
+      lines_iter: &mut I,
+      mapping_symbols: &HashMap<String, String>) -> Result<Frame, Box<Error>>
       where I: Iterator<Item=io::Result<String>>,
   {
       // 1. read current timestep
