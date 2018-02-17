@@ -1008,7 +1008,7 @@ create a terse version of .bonds file
   use std::path::Path;
 
   use clap::{App, Arg, AppSettings};
-  use reaxb::parse_lammps_files;
+  use reaxb::{parse_lammps_files, write_formated_text};
 #+end_src
 
 **** main
@@ -1047,7 +1047,8 @@ create a terse version of .bonds file
 
   fn main() {
       let filename = get_filename().unwrap();
-      let frames = parse_lammps_files(&filename);
+      let frames = parse_lammps_files(&filename).unwrap();
+      write_formated_text(&frames, "test.txt");
   }
 #+END_SRC
 
@@ -1066,7 +1067,7 @@ create a terse version of .bonds file
   mod lammps;
 
   use std::collections::HashMap;
-  pub use lammps::parse_lammps_files;
+  pub use lammps::{parse_lammps_files, write_formated_text};
 #+end_src
 
 **** structs
@@ -1099,7 +1100,7 @@ create a terse version of .bonds file
   use std::collections::HashMap;
 #+end_src
 
-**** atom data
+**** atom
 定义与Atom相关的元信息
 #+name: 43366bc0-f1ca-4338-9289-0f637affbfda
 #+begin_src rust
@@ -1116,13 +1117,13 @@ create a terse version of .bonds file
 #+name: 455910f5-3d04-48b0-a9cc-a46516ba6c1c
 #+begin_src rust
   impl AtomData {
-      pub fn new() -> AtomData {
+      pub fn new() -> Self {
           let ns:Vec<usize> = Vec::new();
 
           AtomData {
               index: 0,
               charge: 0.0,
-              symbol: "H".to_string(),
+              symbol: String::from_str("H"),
               neighbors: ns,
           }
       }
@@ -1247,17 +1248,6 @@ create a terse version of .bonds file
   }
 #+end_src
 
-**** guess element from masses
-LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接读Masses部分中相
-应的注释吧.
-
-#+name: 66a225cc-1a72-4cb5-9dd1-94653871beba
-#+begin_src rust :tangle no
-  fn guess_element_from_mass(mass: f32) {
-      ;
-  }
-#+end_src
-
 *** graph.rs
 :PROPERTIES:
 :header-args: :tangle reaxb/src/graph.rs
@@ -1346,10 +1336,10 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 **** base structs
 #+name: ec36c72e-4d04-447e-bd3d-bd4c6c3c49bb
 #+begin_src rust
-  // store system information
-  struct SystemInfo {
-      natoms: usize,
-      mapping_symbols: HashMap<usize, String>,
+  // data structure for a single frame
+  struct TrajectoryFrame {
+      timestep: usize,            // current timestep
+      atoms: Vec<AtomData>,
   }
 #+end_src
 
@@ -1366,21 +1356,56 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       let path_lammps_data = path.with_extension("data");
       let path_lammps_bonds = path.with_extension("bonds-terse");
 
-      assert!(path_lammps_data.is_file());
-      assert!(path_lammps_bonds.is_file());
+      if ! path_lammps_data.is_file() {
+          let msg = format!("data file not found: {:}", path_lammps_data.display());
+          Err(msg)?;
+      }
+      if ! path_lammps_bonds.is_file() {
+          let msg = format!("bonds file not found: {:}", path_lammps_bonds.display());
+          Err(msg)?;
+      }
 
-      let f = File::open(path_lammps_data)?;
+      // read atom indices and symbols
+      let symbols = parse_lammps_data_file(&path_lammps_data)?;
 
-      // read number of atoms and atom symbols from .data file
-      let mut natoms = 0;
-      let mut mapping_symbols: HashMap<String, String> = HashMap::new();
-      // let filename = path_lammps_data.to_str().unwrap();
-      // parse_lammps_data_file(&filename);
+      // assign connectivity
+      parse_terse_bonds_file(&path_lammps_bonds, &symbols)
+  }
+#+end_src
 
-      // read bonds from .bonds file
-      let filename = path_lammps_bonds.to_str().unwrap();
+#+name: 4540ac95-d7d0-42a2-aef3-bcee0abc5586
+#+begin_src rust
+  pub fn write_formated_text(frames: &Vec<Frame>, outfile: &str) {
+      let path = Path::new(outfile);
+      // let writer = BufWriter(path);
 
-      parse_terse_bonds_file(&filename, &mapping_symbols)
+      let mut species:HashMap<String, usize> = HashMap::new();
+      for frame in frames {
+          for (k, v) in &frame.fragments {
+              let x = species.entry(k.to_string()).or_insert(0_usize);
+              ,*x += v;
+          }
+      }
+
+      let mut count_vec: Vec<_> = species.iter().collect();
+      count_vec.sort_by_key(|k| k.1);
+      count_vec.reverse();
+
+      let vs:Vec<String> = count_vec.iter().map(|x| x.0.to_string()).collect();
+      print!("Timestep ");
+      let max_columns = 100;
+      let vs = &vs[..max_columns];
+      println!("{:}", vs.join(" "));
+
+      for frame in frames {
+          print!("{:^width$}", frame.timestep, width="Timestep ".len());
+          let mut lst = Vec::new();
+          for k in vs.iter() {
+              let count = frame.fragments.get(k).unwrap_or(&0_usize);
+              lst.push(format!("{:^width$}", count, width=k.len()));
+          }
+          println!("{}", lst.join(" "));
+      }
   }
 #+end_src
 
@@ -1400,16 +1425,16 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 
 ***** src
 - 关键信息: 所有原子对应的元素类型.
-- 数据类型选择HashMap, key为index, value为AtomData
+- 数据类型选择HashMap, key为index, value为元素符号
 
 #+name: 1f4bb42e-6c9c-41d1-b9f3-e0908813187a
 #+begin_src rust
   /// read data from lammps .data file
-  fn parse_lammps_data_file(filename: &str) -> Result<HashMap<usize, AtomData>, Box<Error>>
+  fn parse_lammps_data_file(path: &Path) -> Result<HashMap<usize, String>, Box<Error>>
   {
-      eprintln!("reading data file: {}", &filename);
+      eprintln!("reading data file: {}", path.display());
 
-      let fp = File::open(filename)?;
+      let fp = File::open(path)?;
       let mut reader = BufReader::new(fp);
       let mut lines_iter = reader.lines().peekable();
 
@@ -1420,7 +1445,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
               Err(msg)?;
           }
       } else {
-          let msg = format!("Expect more lines: {}", &filename);
+          let msg = format!("Expect more lines: {}", path.display());
           Err(msg)?;
       }
 
@@ -1493,7 +1518,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       // 4. read in atom index and atom type
       assert!(natoms > 0);
 
-      let mut atoms = HashMap::new();
+      let mut symbols = HashMap::new();
       loop {
           if let Some(line) = lines_iter.next() {
               let line = line?;
@@ -1501,15 +1526,14 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
                   // skip one blank line
                   lines_iter.next();
                   for _ in 0..natoms {
-                      let mut data = AtomData::new();
                       if let Some(line) = lines_iter.next() {
                           let line = line?;
                           let mut attrs = line.split_whitespace();
                           let index = attrs.next().unwrap();
                           let t = attrs.next().unwrap();
-                          data.index = index.parse().unwrap();
-                          data.symbol = mapping_symbols.get(t).unwrap().to_string();
-                          atoms.insert(data.index, data);
+                          let index = index.parse().unwrap();
+                          let symbol = mapping_symbols.get(t).unwrap().to_string();
+                          symbols.insert(index, symbol);
                       } else {
                           Err("Atom records are incomplete.")?;
                       }
@@ -1521,7 +1545,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
           }
       }
 
-      Ok(atoms)
+      Ok(symbols)
   }
 #+end_src
 
@@ -1529,13 +1553,16 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 #+name: 52bb7570-33ac-44ae-950b-c7d67d597e76
 #+begin_src rust
   #[test]
+  #[ignore]
   fn test_parse_data_file() {
       let filename = "/home/ybyygu/Incoming/FeC reaxff tests/FeCO/terse-tests/test.data";
-      parse_lammps_data_file(&filename);
+      let path = Path::new(&filename);
+      let symbols = parse_lammps_data_file(&path);
+      println!("{:?}", symbols);
   }
 #+end_src
 
-**** bonds file
+**** TODO bonds file
 从bonds文件读入不同timestep时对应的键连信息.
 
 注意: 该文件中的给出的原子类型可能与data文件不同(测试文件的问题?). 应以data文件
@@ -1757,13 +1784,11 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 ***** on file basis
 #+name: 1cb4fcf1-d093-41ce-a011-f88a95c9bf7b
 #+begin_src rust
-  fn parse_terse_bonds_file (
-      filename: &str,
-      mapping_symbols: &HashMap<String, String>)
-      -> Result<Vec<Frame>, Box<Error>>
+  fn parse_terse_bonds_file (path: &Path, symbols: &HashMap<usize, String>)
+                             -> Result<Vec<Frame>, Box<Error>>
   {
       // create file handler and a buffle reader
-      let fp = File::open(filename)?;
+      let fp = File::open(path)?;
       let mut reader = BufReader::new(fp);
       let mut lines_iter = reader.lines().peekable();
 
@@ -1773,13 +1798,19 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
       let mut frames = Vec::new();
       loop {
           if lines_iter.peek().is_none() {
-              eprintln!("reached the end of the file.");
+              eprintln!("reached the end of the file: {}", path.display());
               break;
           }
+
           // process a single frame
-          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter, &mapping_symbols)?;
+          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter, &symbols)?;
+          eprintln!("timestep {:}, done.", frame.timestep);
+          eprintln!("fragments {:?}", frame.fragments);
+          // // for test
+          // if frame.timestep > 5000_usize {
+          //     break;
+          // }
           frames.push(frame);
-          break;
       }
 
       Ok(frames)
@@ -1798,7 +1829,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
 #+begin_src rust
   fn parse_terse_bonds_file_single_frame<I> (
       lines_iter: &mut I,
-      mapping_symbols: &HashMap<String, String>) -> Result<Frame, Box<Error>>
+      symbols: &HashMap<usize, String>) -> Result<Frame, Box<Error>>
       where I: Iterator<Item=io::Result<String>>,
   {
       // 1. read current timestep
@@ -1831,6 +1862,7 @@ LAMMPS的data文件中只有Masses信息. 从mass猜element太麻烦了, 直接�
               let (charge, neighbors) = parse_terse_bonds_file_single_line(&line);
               data.index = n;
               data.charge = charge;
+              data.symbol = symbols.get(&data.index).unwrap().to_string();
               for x in neighbors {
                   data.neighbors.push(x+n);
               }
