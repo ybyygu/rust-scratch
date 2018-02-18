@@ -3,7 +3,22 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [1/9]
+* Memo [1/10]
+** [2018-02-18 Sun] 使approx crate来测试浮点数值的匹配性
+#+name: c388cfa1-83ec-4833-af78-b3a6698def26
+#+begin_src rust
+  #[macro_use]
+  extern crate approx;
+
+  assert_relative_eq!(expected, actual, epsilon=1e-4);
+#+end_src
+
+** [2018-02-18 Sun] Rust中的浮点数没有实现全序, 不能使用max, min函数
+: [0.0, xy, xz, xy+xz].iter().fold(f64::MIN, |a, &b| a.max(b));
+
+** TODO [2018-02-17 Sat] ovito输出至POSCAR后 原子次序会重排. 需要结构提取功能.
+需要写一个能输出CIF文件的程序. 保留原子次序和键连关系.
+
 ** [2018-02-16 Fri] peek的用法
 很容易报错:
 : cannot move out of borrowed content
@@ -985,6 +1000,7 @@ create a terse version of .bonds file
   [dependencies]
   petgraph = "*"
   clap = "*"
+  approx = "*"
 #+END_SRC
 
 ** src
@@ -1061,6 +1077,9 @@ create a terse version of .bonds file
 #+name: 68b8f3aa-b3f8-43c0-8b4d-c3165b146535
 #+begin_src rust
   extern crate petgraph;
+
+  #[macro_use]
+  extern crate approx;
 
   mod atoms;
   mod graph;
@@ -1559,6 +1578,193 @@ create a terse version of .bonds file
       let path = Path::new(&filename);
       let symbols = parse_lammps_data_file(&path);
       println!("{:?}", symbols);
+  }
+#+end_src
+**** dump file
+***** lammps dump box
+正交格子(orthogonal simulation box)
+#+BEGIN_EXAMPLE
+  ITEM: BOX BOUNDS xx yy zz
+  xlo xhi
+  ylo yhi
+  zlo zhi
+#+END_EXAMPLE
+
+: a = (xhi-xlo, 0, 0)
+: b = (0, yhi-ylo, 0)
+: c = (0, 0, zhi-zlo)
+
+非正交(triclinic simulation boxes):
+#+BEGIN_EXAMPLE
+  ITEM: BOX BOUNDS xy xz yz xx yy zz
+  xlo_bound xhi_bound xy
+  ylo_bound yhi_bound xz
+  zlo_bound zhi_bound yz
+#+END_EXAMPLE
+
+: a = (xhi-xlo, 0, 0)
+: b = (xy, yhi-ylo, 0)
+: c = (xz, yz, zhi-zlo)
+
+: xlo_bound = xlo + MIN(0.0,xy,xz,xy+xz)
+: xhi_bound = xhi + MAX(0.0,xy,xz,xy+xz)
+: ylo_bound = ylo + MIN(0.0,yz)
+: yhi_bound = yhi + MAX(0.0,yz)
+: zlo_bound = zlo
+: zhi_bound = zhi
+
+
+用OVITO检查结构是否正确.
+
+ovito的代码:
+: Codes/ovito/src/plugins/particles/import/lammps/LAMMPSTextDumpImporter.cpp
+
+References
+- http://lammps.sandia.gov/doc/Section_howto.html#triclinic-non-orthogonal-simulation-boxes
+
+***** src
+#+name: 32374d0e-1d81-4ec0-a8b3-0fb7950a625a
+#+begin_src rust
+  use std::f64;
+
+  enum BoxStyle {
+      Orthogonal,
+      Triclinic,
+  }
+
+  fn parse_lammps_dump_box(txt: &str) -> Result<[[f64; 3]; 3], Box<Error>>{
+      use self::BoxStyle::{Orthogonal, Triclinic};
+
+      let mut lines_iter = txt.lines();
+
+      let mut hi    = [0.0; 3];
+      let mut lo    = [0.0; 3];
+      let mut tilt  = [0.0; 3];
+      let mut style = Orthogonal;
+
+      if let Some(line) = lines_iter.next() {
+          if line.starts_with("ITEM: BOX BOUNDS") {
+              let attrs = line.split_whitespace();
+              style = match attrs.count() {
+                  6 => Orthogonal,
+                  9 => Triclinic,
+                  _ => Err(format!("unexpected box style: {}", &line))?,
+              };
+
+              for i in 0..3 {
+                  if let Some(line) = lines_iter.next() {
+                      let mut attrs:Vec<f64> = line.split_whitespace().map(|x| x.parse::<f64>().unwrap()).collect();
+                      match style {
+                          Orthogonal => {
+                              lo[i] = attrs[0];
+                              hi[i] = attrs[1];
+                          },
+                          Triclinic => {
+                              lo[i] = attrs[0];
+                              hi[i] = attrs[1];
+                              tilt[i] = attrs[2];
+                          },
+                      }
+                  } else {
+                      Err("lammps box is incomplete!")?;
+                  }
+              }
+          } else {
+              let msg = format!("expect LAMMPS BOX header, but found: {}", &line);
+              Err(msg)?;
+          }
+      } else {
+          Err("why")?;
+      }
+
+      let mut va = [0.0; 3];
+      let mut vb = [0.0; 3];
+      let mut vc = [0.0; 3];
+      match style {
+          Orthogonal => {
+              va[0] = hi[0] - lo[0];
+              vb[1] = hi[1] - lo[1];
+              vc[2] = hi[2] - lo[2];
+          },
+          Triclinic  => {
+              let xy = tilt[0];
+              let xz = tilt[1];
+              let yz = tilt[2];
+
+              // x vector
+              let xlo = lo[0] - [0.0, xy, xz, xy+xz].iter().fold(f64::MAX, |a, &b| a.min(b));
+              let xhi = hi[0] - [0.0, xy, xz, xy+xz].iter().fold(f64::MIN, |a, &b| a.max(b));
+              va[0] = xhi - xlo;
+              // y vector
+              let ylo = lo[1] - [0.0, yz].iter().fold(f64::MAX, |a, &b| a.min(b));
+              let yhi = hi[1] - [0.0, yz].iter().fold(f64::MIN, |a, &b| a.max(b));
+              vb[0] = xy;
+              vb[1] = yhi - ylo;
+              // z vector
+              let zlo = lo[2];
+              let zhi = hi[2];
+              vc[0] = xz;
+              vc[1] = yz;
+              vc[2] = zhi - zlo;
+          },
+      }
+
+      Ok([va, vb, vc])
+  }
+#+end_src
+
+***** tests
+#+name: 398e563b-0ad5-4845-a5c3-97c115748e74
+#+begin_src rust
+  #[test]
+  fn test_lammps_box() {
+      let box1 = "ITEM: BOX BOUNDS pp pp pp
+  -0.195983 11.329
+  -0.195983 11.329
+  -0.195983 11.329";
+
+      // results from ovito
+      let cell_vector1 = [11.525, 0.0, 0.0];
+      let cell_vector2 = [0.0, 11.525, 0.0];
+      let cell_vector3 = [0.0, 0.0, 11.525];
+      let cell_origin  = [-0.195983, -0.195983, -0.195983];
+
+      let vts = parse_lammps_dump_box(&box1).unwrap();
+
+      assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[2][2], cell_vector3[2] as f64, epsilon=1.0e-4);
+
+      let box2 = "ITEM: BOX BOUNDS xy xz yz pp pp pp
+  -0.08189 15.3282 -0.045807
+  0.072939 15.5755 0
+  0.001924 17.4877 0";
+
+      // results from ovito
+      let cell_vector1 = [15.3643, 0.0, 0.0];
+      let cell_vector2 = [-0.045807, 15.5026, 0.0];
+      let cell_vector3 = [0.0, 0.0, 17.4858];
+      let cell_origin  = [-0.036083, 0.072939, 0.001924];
+
+      let vts = parse_lammps_dump_box(&box2).unwrap();
+      assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[1][0], cell_vector2[0] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[2][2], cell_vector3[2] as f64, epsilon=1.0e-4);
+
+      let box3 = "ITEM: BOX BOUNDS pp pp ff
+  0.0000000000000000e+00 2.2931000000000001e+01
+  0.0000000000000000e+00 2.2931000000000001e+01
+  -1.0000000000000000e+00 5.0497999999999998e+01
+  ";
+      let cell_vector1 = [22.931, 0.0, 0.0];
+      let cell_vector2 = [0.0, 22.931, 0.0];
+      let cell_vector3 = [0.0, 0.0, 51.498];
+      let cell_origin = [0.0, 0.0, -1.0];
+      let vts = parse_lammps_dump_box(&box3).unwrap();
+      assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
+      assert_relative_eq!(vts[2][2], cell_vector3[2] as f64, epsilon=1.0e-4);
   }
 #+end_src
 
