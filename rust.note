@@ -1582,6 +1582,7 @@ create a terse version of .bonds file
 #+end_src
 **** dump file
 ***** lammps dump box
+****** info
 正交格子(orthogonal simulation box)
 #+BEGIN_EXAMPLE
   ITEM: BOX BOUNDS xx yy zz
@@ -1613,16 +1614,17 @@ create a terse version of .bonds file
 : zlo_bound = zlo
 : zhi_bound = zhi
 
-
 用OVITO检查结构是否正确.
 
 ovito的代码:
 : Codes/ovito/src/plugins/particles/import/lammps/LAMMPSTextDumpImporter.cpp
+mdtrj中的相关代码:
+: Codes/mdtraj/mdtraj/formats/lammpstrj.py
 
 References
 - http://lammps.sandia.gov/doc/Section_howto.html#triclinic-non-orthogonal-simulation-boxes
 
-***** src
+****** src
 #+name: 32374d0e-1d81-4ec0-a8b3-0fb7950a625a
 #+begin_src rust
   use std::f64;
@@ -1713,7 +1715,7 @@ References
   }
 #+end_src
 
-***** tests
+****** tests
 #+name: 398e563b-0ad5-4845-a5c3-97c115748e74
 #+begin_src rust
   #[test]
@@ -1765,6 +1767,56 @@ References
       assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[2][2], cell_vector3[2] as f64, epsilon=1.0e-4);
+  }
+#+end_src
+***** lammps dump atoms
+读入原子坐标信息
+****** src
+#+name: dd0f9789-eb7f-492a-aa0d-24a76d346f76
+#+begin_src rust
+  fn get_lammps_dump_atoms(txt: &str, natoms: &usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
+      let mut lines_iter = txt.lines();
+      if let Some(line) = lines_iter.next() {
+          assert!(line.starts_with("ITEM: ATOMS id type x y z"));
+      } else {
+          Err("failed to read atoms header.")?;
+      }
+
+      let mut atoms = HashMap::new();
+      for _ in 0..*natoms {
+          if let Some(line) = lines_iter.next() {
+              let mut attrs:Vec<_> = line.split_whitespace().collect();
+              assert!(attrs.len() >= 5, line.to_string());
+              let index:usize = attrs[0].parse().unwrap();
+              let x:f64 = attrs[2].parse().unwrap();
+              let y:f64 = attrs[3].parse().unwrap();
+              let z:f64 = attrs[4].parse().unwrap();
+              atoms.insert(index, [x, y, z]);
+          } else {
+              Err("atom records are incomplete")?;
+          }
+      }
+
+      Ok(atoms)
+  }
+#+end_src
+
+****** tests
+#+name: afe1d362-438a-4e03-939d-50e9eaac21e1
+#+begin_src rust
+  #[test]
+  fn test_parse_dump_atoms() {
+      let txt = "ITEM: ATOMS id type x y z
+  1 1 3.77622 3.9054 0.009267
+  2 1 3.77622 3.9054 2.90503
+  3 1 1.89072 1.66683 4.37145
+  4 1 4.97252 1.29462 4.37145
+  5 2 4.73984 2.09641 0.131493";
+
+      let natoms = 5_usize;
+      let atoms = get_lammps_dump_atoms(&txt, &natoms).unwrap();
+      assert_relative_eq!(3.77622, &atoms[&1_usize][0]);
+      assert_relative_eq!(0.131493, &atoms[&5_usize][2]);
   }
 #+end_src
 
