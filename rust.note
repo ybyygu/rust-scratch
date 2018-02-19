@@ -1095,15 +1095,18 @@ create a terse version of .bonds file
   pub struct Frame {
       pub timestep: usize,
       pub fragments: HashMap<String, usize>,
+      pub positions: HashMap<usize, [f64; 3]>,
   }
 
   impl Frame {
       pub fn new() -> Frame{
-          let map:HashMap<String, usize> = HashMap::new();
+          let map1: HashMap<String, usize> = HashMap::new();
+          let map2: HashMap<usize, [f64; 3]> = HashMap::new();
 
           Frame {
               timestep:0,
-              fragments: map
+              fragments: map1,
+              positions: map2,
           }
       }
   }
@@ -1581,6 +1584,108 @@ create a terse version of .bonds file
   }
 #+end_src
 **** dump file
+***** lammps dump frame
+提取特定帧对应的坐标信息.
+****** src
+#+name: daedfe6b-34ed-4dd1-94a2-4e698a00a42c
+#+begin_src rust
+  fn parse_lammps_dump_file(path: &Path, target_timestep: usize) -> Result<Frame, Box<Error>> {
+      let fp = File::open(path)?;
+      let mut reader = BufReader::new(fp);
+
+      let mut timestep = 0;
+      let mut natoms = 0;
+      let mut frame = Frame::new();
+
+      let mut timestep = 0_usize;
+      let mut natoms = 0_usize;
+      let mut buf = String::new();
+      loop {
+          // 0. sanity check
+          buf.clear();
+          let nb = reader.read_line(&mut buf)?;
+          if nb <= 0 {
+              eprintln!("reached the end of the file: {}", path.display());
+              break;
+          }
+          assert!(buf.starts_with("ITEM: TIMESTEP"), format!("Expect the frame header, but: {}", buf));
+
+          // 1. get current timestep
+          buf.clear();
+          let nb = reader.read_line(&mut buf)?;
+          if nb <= 0 {
+              Err("Expect more lines: failed to read timestep!")?;
+          }
+          timestep = buf.trim_right().parse()?;
+
+          // 2. get number of atoms
+          for i in 0..2 {
+              buf.clear();
+              let nb = reader.read_line(&mut buf)?;
+              if nb > 0 {
+                  if i == 1 {
+                      natoms = buf.trim_right().parse()?;
+                  }
+              } else {
+                  Err("Expect more lines: failed to read number of atoms!")?;
+              }
+          }
+
+          // 3. get lammps box and atoms
+          assert!(natoms > 0, buf);
+          println!("current timestep = {:?}", timestep);
+          if timestep < target_timestep {
+              for _ in 0..(natoms + 5) {
+                  let nb = reader.read_line(&mut buf)?;
+                  if nb <= 0 {
+                      Err("Expect more lines: failed to read lammps box and atoms")?;
+                  }
+              }
+          } else if timestep == target_timestep {
+              buf.clear();
+              // 3.1 the lammps box
+              for _ in 0..4 {
+                  let nb = reader.read_line(&mut buf)?;
+                  if nb <= 0 {
+                      Err("Expect more lines: failed to read lammps box!")?;
+                  }
+              }
+              let x = parse_lammps_dump_box(&buf)?;
+              println!("{:?}", x);
+
+              // 3.2 the atom records
+              buf.clear();
+              for _ in 0..(natoms+1) {
+                  let nb = reader.read_line(&mut buf)?;
+                  if nb <= 0 {
+                      Err("Expect more lines: failed to read atom records!")?;
+                  }
+              }
+              let x = get_lammps_dump_atoms(&buf, natoms)?;
+              println!("{:?}", x);
+              break;
+          } else {
+              let msg = format!("Requested timestep {} not found in {}", target_timestep, path.display());
+              Err(msg)?;
+          }
+      }
+
+      Ok(frame)
+  }
+#+end_src
+****** tests
+#+name: 69313c0d-d969-40b4-a338-ff274407d54d
+#+begin_src rust
+  #[test]
+  fn test_parse_lammps_dump_file() {
+      let filename = "/home/ybyygu/Workspace/Programming/reaction-analysis/tests/FeCO/Fe100_8816_50CO_500_500K.dump";
+      let path = Path::new(&filename);
+
+      let frame = parse_lammps_dump_file(&path, 200_usize).unwrap();
+      println!("{:?}", frame.positions);
+  }
+#+end_src
+
 ***** lammps dump box
 ****** info
 正交格子(orthogonal simulation box)
@@ -1774,7 +1879,7 @@ References
 ****** src
 #+name: dd0f9789-eb7f-492a-aa0d-24a76d346f76
 #+begin_src rust
-  fn get_lammps_dump_atoms(txt: &str, natoms: &usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
+  fn get_lammps_dump_atoms(txt: &str, natoms: usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
       let mut lines_iter = txt.lines();
       if let Some(line) = lines_iter.next() {
           assert!(line.starts_with("ITEM: ATOMS id type x y z"));
@@ -1783,7 +1888,7 @@ References
       }
 
       let mut atoms = HashMap::new();
-      for _ in 0..*natoms {
+      for _ in 0..natoms {
           if let Some(line) = lines_iter.next() {
               let mut attrs:Vec<_> = line.split_whitespace().collect();
               assert!(attrs.len() >= 5, line.to_string());
@@ -1814,7 +1919,7 @@ References
   5 2 4.73984 2.09641 0.131493";
 
       let natoms = 5_usize;
-      let atoms = get_lammps_dump_atoms(&txt, &natoms).unwrap();
+      let atoms = get_lammps_dump_atoms(&txt, natoms).unwrap();
       assert_relative_eq!(3.77622, &atoms[&1_usize][0]);
       assert_relative_eq!(0.131493, &atoms[&5_usize][2]);
   }
