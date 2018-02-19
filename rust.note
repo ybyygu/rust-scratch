@@ -1094,8 +1094,10 @@ create a terse version of .bonds file
 #+begin_src rust
   pub struct Frame {
       pub timestep: usize,
+      pub natoms: usize,
       pub fragments: HashMap<String, usize>,
       pub positions: HashMap<usize, [f64; 3]>,
+      pub cell: [[f64; 3]; 3],
   }
 
   impl Frame {
@@ -1104,9 +1106,11 @@ create a terse version of .bonds file
           let map2: HashMap<usize, [f64; 3]> = HashMap::new();
 
           Frame {
-              timestep:0,
+              timestep: 0,
+              natoms: 0,
               fragments: map1,
               positions: map2,
+              cell: [[0_f64; 3]; 3],
           }
       }
   }
@@ -1589,7 +1593,7 @@ create a terse version of .bonds file
 ****** src
 #+name: daedfe6b-34ed-4dd1-94a2-4e698a00a42c
 #+begin_src rust
-  fn parse_lammps_dump_file(path: &Path, target_timestep: usize) -> Result<Frame, Box<Error>> {
+  fn get_frame_from_lammps_dump_file(path: &Path, target_timestep: usize) -> Result<Frame, Box<Error>> {
       let fp = File::open(path)?;
       let mut reader = BufReader::new(fp);
 
@@ -1650,19 +1654,20 @@ create a terse version of .bonds file
                       Err("Expect more lines: failed to read lammps box!")?;
                   }
               }
-              let x = parse_lammps_dump_box(&buf)?;
-              println!("{:?}", x);
+              let cell = get_lammps_dump_box(&buf)?;
+              frame.cell = cell;
 
               // 3.2 the atom records
               buf.clear();
               for _ in 0..(natoms+1) {
                   let nb = reader.read_line(&mut buf)?;
                   if nb <= 0 {
-                      Err("Expect more lines: failed to read atom records!")?;
+                      Err("Expect more lines: failed to read all atom records!")?;
                   }
               }
-              let x = get_lammps_dump_atoms(&buf, natoms)?;
-              println!("{:?}", x);
+              let positions = get_lammps_dump_atoms(&buf, natoms)?;
+              frame.positions = positions;
+              // ignore remaining lines
               break;
           } else {
               let msg = format!("Requested timestep {} not found in {}", target_timestep, path.display());
@@ -1677,11 +1682,12 @@ create a terse version of .bonds file
 #+name: 69313c0d-d969-40b4-a338-ff274407d54d
 #+begin_src rust
   #[test]
+  #[ignore]
   fn test_parse_lammps_dump_file() {
       let filename = "/home/ybyygu/Workspace/Programming/reaction-analysis/tests/FeCO/Fe100_8816_50CO_500_500K.dump";
       let path = Path::new(&filename);
 
-      let frame = parse_lammps_dump_file(&path, 200_usize).unwrap();
+      let frame = get_frame_from_lammps_dump_file(&path, 200_usize).unwrap();
       println!("{:?}", frame.positions);
   }
 #+end_src
@@ -1739,7 +1745,7 @@ References
       Triclinic,
   }
 
-  fn parse_lammps_dump_box(txt: &str) -> Result<[[f64; 3]; 3], Box<Error>>{
+  fn get_lammps_dump_box(txt: &str) -> Result<[[f64; 3]; 3], Box<Error>>{
       use self::BoxStyle::{Orthogonal, Triclinic};
 
       let mut lines_iter = txt.lines();
@@ -1836,7 +1842,7 @@ References
       let cell_vector3 = [0.0, 0.0, 11.525];
       let cell_origin  = [-0.195983, -0.195983, -0.195983];
 
-      let vts = parse_lammps_dump_box(&box1).unwrap();
+      let vts = get_lammps_dump_box(&box1).unwrap();
 
       assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
@@ -1853,7 +1859,7 @@ References
       let cell_vector3 = [0.0, 0.0, 17.4858];
       let cell_origin  = [-0.036083, 0.072939, 0.001924];
 
-      let vts = parse_lammps_dump_box(&box2).unwrap();
+      let vts = get_lammps_dump_box(&box2).unwrap();
       assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[1][0], cell_vector2[0] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
@@ -1868,7 +1874,7 @@ References
       let cell_vector2 = [0.0, 22.931, 0.0];
       let cell_vector3 = [0.0, 0.0, 51.498];
       let cell_origin = [0.0, 0.0, -1.0];
-      let vts = parse_lammps_dump_box(&box3).unwrap();
+      let vts = get_lammps_dump_box(&box3).unwrap();
       assert_relative_eq!(vts[0][0], cell_vector1[0] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[1][1], cell_vector2[1] as f64, epsilon=1.0e-4);
       assert_relative_eq!(vts[2][2], cell_vector3[2] as f64, epsilon=1.0e-4);
@@ -2274,6 +2280,93 @@ References
 
 ** tests                                                            :ATTACH:
 这个目录下的代码用于集成测试.
+*** cell transform
+**** info
+1. 将cartesian坐标转为fractional坐标
+2. 将cell vectors转为cell parameters(a, b, c, alpha, beta, gamma)
+
+: inverse = np.linalg.inv(matrix.T)
+: inverse.dot(cartesian)
+
+#+name: e144d691-9579-4fc5-ab53-0f3e139b3169
+#+BEGIN_SRC text
+  cell vectors
+  5.0900002 0.0 0.0
+  0.0 6.7399998 0.0
+  0.0 0.0 4.5300002
+  Cartesian
+  2.1832399 1.685 3.8505002
+  6.9067602 5.0549998 0.6795
+  4.3617602 5.0549998 1.5855
+  4.72824 1.685 2.9445
+  2.94674 0.42462 1.48584
+  6.14326 6.3153796 3.0441599
+  5.4917403 2.9453802 0.77916
+  3.59826 3.7946203 3.75084
+  6.14326 3.7946203 3.0441599
+  2.94674 2.9453802 1.48584
+  3.59826 6.3153796 3.75084
+  5.4917403 0.42462 0.77916
+  6.5300999 1.685 2.0385001
+  2.5599001 5.0549998 2.4914997
+  5.1048999 5.0549998 4.3035002
+  3.9851 1.685 0.2265
+#+END_SRC
+
+#+name: 70e96a58-af80-4acc-abb8-e10a4e531a18
+#+BEGIN_SRC text
+  _cell_length_a       5.0900
+  _cell_length_b       6.7400
+  _cell_length_c       4.5300
+  _cell_angle_alpha     90.0000
+  _cell_angle_beta     90.0000
+  _cell_angle_gamma     90.0000
+
+  C   C1         0.42893     0.25000     0.85000
+  C   C2         1.35693     0.75000     0.15000
+  C   C3         0.85693     0.75000     0.35000
+  C   C4         0.92893     0.25000     0.65000
+  C   C5         0.57893     0.06300     0.32800
+  C   C6         1.20693     0.93700     0.67200
+  C   C7         1.07893     0.43700     0.17200
+  C   C8         0.70693     0.56300     0.82800
+  C   C9         1.20693     0.56300     0.67200
+  C   C10        0.57893     0.43700     0.32800
+  C   C11        0.70693     0.93700     0.82800
+  C   C12        1.07893     0.06300     0.17200
+  H   H13        1.28293     0.25000     0.45000
+  H   H14        0.50293     0.75000     0.55000
+  H   H15        1.00293     0.75000     0.95000
+  H   H16        0.78293     0.25000     0.05000
+#+END_SRC
+
+**** test.rs
+:PROPERTIES:
+:header-args: :tangle reaxb/tests/test.rs
+:END:
+
+#+name: 6746df7d-0871-43bf-98cd-2e00e15020a5
+#+begin_src rust
+  fn cart_to_frac() {
+      ;
+  }
+#+end_src
+
+#+name: c90b9d01-096f-47c1-bbfd-2649862e61dc
+#+begin_src rust
+  fn cell_vectors_to_parameters() {
+      ;
+  }
+#+end_src
+
+#+name: 9cab3b07-9781-48cd-a6fb-e6ee248b93dd
+#+begin_src rust
+  #[test]
+  fn test_cell() {
+      ;
+  }
+#+end_src
+
 *** test_graph.rs
 :PROPERTIES:
 :header-args: :tangle reaxb/tests/test_graph.rs
