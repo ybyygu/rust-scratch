@@ -1233,7 +1233,7 @@ create a terse version of .bonds file
       pub cell     : [[f64; 3]; 3],
       pub symbols  : HashMap<usize, String>,
       pub positions: HashMap<usize, [f64; 3]>,
-
+      pub neighbors: HashMap<usize, Vec<usize>>,
   }
 #+end_src
 
@@ -1244,6 +1244,7 @@ create a terse version of .bonds file
           let positions: HashMap<usize, [f64; 3]> = HashMap::new();
           let symbols  : HashMap<usize, String> = HashMap::new();
           let cell = [[0_f64; 3]; 3];
+          let neighbors: HashMap<usize, Vec<usize>> = HashMap::new();
 
           TrajectoryFrame {
               timestep : 0,
@@ -1251,6 +1252,7 @@ create a terse version of .bonds file
               positions: positions,
               symbols  : symbols,
               cell     : cell,
+              neighbors: neighbors,
           }
       }
   }
@@ -1431,11 +1433,25 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       }
 
       // bonds
-      // lines.push_str("loop_\n");
-      // lines.push_str("_geom_bond_atom_site_label_1\n");
-      // lines.push_str("_geom_bond_atom_site_label_2\n");
-      // lines.push_str("_geom_bond_site_symmetry_2\n");
-      // lines.push_str("_ccdc_geom_bond_type\n");
+      if frame.neighbors.len() > 0 {
+          lines.push_str("loop_\n");
+          lines.push_str("_geom_bond_atom_site_label_1\n");
+          lines.push_str("_geom_bond_atom_site_label_2\n");
+          lines.push_str("_geom_bond_site_symmetry_2\n");
+          lines.push_str("_ccdc_geom_bond_type\n");
+          for (current, connected) in frame.neighbors {
+              for other in connected {
+                  if other > current {
+                      let symbol1 = frame.symbols.get(&current).unwrap();
+                      let symbol2 = frame.symbols.get(&other).unwrap();
+                      let name1 = format!("{}{}", symbol1, current);
+                      let name2 = format!("{}{}", symbol2, other);
+                      lines.push_str(&format!("{:8} {:8} . S\n", name1, name2));
+                  }
+              }
+          }
+      }
+
       println!("{:}", lines);
   }
 #+end_src
@@ -1713,14 +1729,13 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       frame.symbols = parse_lammps_data_file(&path_lammps_data)?;
 
       // assign connectivity
-      // let frames = parse_terse_bonds_file(&path_lammps_bonds, &symbols);
+      frame.neighbors = get_connectivity_from_terse_bonds_file(&path_lammps_bonds, target_timestep)?;
 
       let path_ciffile = path.with_extension(".cif");
       write_as_cif(frame, &path_ciffile);
 
       Ok(())
   }
-
 #+end_src
 
 ***** fragment analysis
@@ -2293,6 +2308,249 @@ References
   }
 #+end_src
 
+**** simplified bonds file
+解释reaxa生成的精减版文件.
+***** on file basis
+#+name: 8497df51-3eb3-41fc-a87d-c1688c94c29f
+#+begin_src rust
+  fn get_connectivity_from_terse_bonds_file(
+      path: &Path,
+      target_timestep: usize) -> Result<HashMap<usize, Vec<usize>>, Box<Error>>
+  {
+      let fp = File::open(path)?;
+      let mut reader = BufReader::new(fp);
+
+      // parse bonds
+      let mut neighbors: HashMap<usize, Vec<usize>> = HashMap::new();
+
+      let mut timestep = 0;
+      let mut natoms = 0;
+      let mut buf = String::new();
+      loop {
+          // 0. sanity check and get current timestep
+          buf.clear();
+          let nb = reader.read_line(&mut buf)?;
+          if nb <= 0 {
+              eprintln!("reached the end of the file: {}", path.display());
+              break;
+          }
+
+          let label = "# Timestep";
+          timestep = get_int_data_from_comment_line(&buf, &label)?;
+          eprintln!("{:?}", timestep);
+
+          // 1. get natoms
+          buf.clear();
+          let nb = reader.read_line(&mut buf)?;
+          if nb <= 0 {
+              Err("Expect more lines: failed to read number of atoms!")?;
+          }
+          let label = "# Number of particles";
+          natoms = get_int_data_from_comment_line(&buf, &label)?;
+
+          // 2. read atom records
+          buf.clear();
+          if timestep < target_timestep {
+              for _ in 0..natoms {
+                  let nb = reader.read_line(&mut buf)?;
+                  if nb <= 0 {
+                      Err("Expect more lines: failed to read all atom records!")?;
+                  }
+              }
+          } else if timestep == target_timestep {
+              for _ in 0..natoms {
+                  let nb = reader.read_line(&mut buf)?;
+                  if nb <= 0 {
+                      Err("Expect more lines: failed to read all atom records!")?;
+                  }
+              }
+              neighbors = get_connectivity_from_terse_bonds_file_frame(&buf, natoms)?;
+              // ignore other parts
+              break;
+          } else {
+              let msg = format!("Requested timestep {} not found in {}", target_timestep, path.display());
+              Err(msg)?;
+          }
+      }
+
+      Ok(neighbors)
+  }
+#+end_src
+
+#+name: 1cb4fcf1-d093-41ce-a011-f88a95c9bf7b
+#+begin_src rust
+  fn parse_terse_bonds_file (path: &Path, symbols: &HashMap<usize, String>)
+                             -> Result<Vec<Frame>, Box<Error>>
+  {
+      // create file handler and a buffle reader
+      let fp = File::open(path)?;
+      let mut reader = BufReader::new(fp);
+      let mut lines_iter = reader.lines().peekable();
+
+      // parse data
+      let mut timestep = 0;
+      let mut natoms = 0;
+      let mut frames = Vec::new();
+      loop {
+          if lines_iter.peek().is_none() {
+              eprintln!("reached the end of the file: {}", path.display());
+              break;
+          }
+
+          // process a single frame
+          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter, &symbols)?;
+          eprintln!("timestep {:}, done.", frame.timestep);
+          eprintln!("fragments {:?}", frame.fragments);
+          // // for test
+          // if frame.timestep > 5000_usize {
+          //     break;
+          // }
+          frames.push(frame);
+      }
+
+      Ok(frames)
+  }
+#+end_src
+
+***** on frame basis
+读入不同原子对应的电荷及connectivity.
+简化版中:
+- 以行数来定原子index.
+- 第一列为浮点数, 对应partial charge
+- 其后几列为与当前原子直接成键的所有原子对应的编号数据. 该数据为键连原子编号与当
+  前原子编号之差, 即index - current
+
+#+name: dd3a4020-2ed5-4c62-a6f7-1d80e0fc6198
+#+begin_src rust
+  fn get_connectivity_from_terse_bonds_file_frame(
+      txt: &str,
+      natoms: usize) -> Result<HashMap<usize, Vec<usize>>, Box<Error>>
+  {
+      let mut neighbors = HashMap::new();
+
+      let mut lines_iter = txt.lines();
+
+      for n in 1..natoms+1 {
+          if let Some(line) = lines_iter.next() {
+              let (charge, nns) = parse_terse_bonds_file_single_line(&line);
+              let mut connected = vec![];
+              for x in nns {
+                  connected.push(x+n);
+              }
+              neighbors.insert(n, connected);
+          } else {
+              Err("Atom data is incomplete.")?;
+          }
+      }
+
+      Ok(neighbors)
+  }
+#+end_src
+
+#+name: b88e850d-3754-49fe-a0a6-cdf0ba8e2169
+#+begin_src rust
+  #[test]
+  fn test_get_connectivity_from_terse_bonds_frame() {
+      let txt = "0.007 8 9 16 896 1017 1016 905 904 120 121 1 112 128
+  0.008 128 112 120 121 1 1016 904 896 16 8 1017 905 9
+  0.009 112 120 128 896 1016 1017 904 905 121 1 8 16 9
+  0.008 120 121 112 1017 1016 905 904 896 8 9 128 16 1
+  0.008 896 1017 1016 1 112 904 120 8 905 16 128 121 9";
+
+      let neighbors = get_connectivity_from_terse_bonds_file_frame(&txt, 5_usize).unwrap();
+      assert_eq!(neighbors.len(), 5);
+
+      let connected = neighbors.get(&1).unwrap();
+      assert_eq!(connected.len(), 13);
+      assert_eq!(connected[0], 9);
+      assert_eq!(connected[1], 10);
+  }
+#+end_src
+
+#+name: 5f005858-636b-4d77-aca5-e6be1baca10a
+#+begin_src rust
+  fn parse_terse_bonds_file_single_frame<I> (
+      lines_iter: &mut I,
+      symbols: &HashMap<usize, String>) -> Result<Frame, Box<Error>>
+      where I: Iterator<Item=io::Result<String>>,
+  {
+      // 1. read current timestep
+      let mut timestep = 0;
+      let label = "# Timestep";
+      if let Some(line) = lines_iter.next() {
+          let line = line?;
+          timestep = get_int_data_from_comment_line(&line, &label)?;
+      } else {
+          Err("Failed to read timestep!")?;
+      }
+
+      // 2. read number of atoms
+      let mut natoms = 0;
+          let label = "# Number of particles";
+      if let Some(line) = lines_iter.next() {
+          let line = line?;
+          natoms = get_int_data_from_comment_line(&line, &label)?;
+      } else {
+          Err("Failed to read number of atoms!")?;
+      }
+
+      // 3. read connectivity for each atom
+      let mut atoms = Vec::new();
+      assert!(natoms > 0);
+      for n in 1..natoms+1 {
+          let mut data = AtomData::new();
+          if let Some(line) = lines_iter.next() {
+              let line = line?;
+              let (charge, neighbors) = parse_terse_bonds_file_single_line(&line);
+              data.index = n;
+              data.charge = charge;
+              data.symbol = symbols.get(&data.index).unwrap().to_string();
+              for x in neighbors {
+                  data.neighbors.push(x+n);
+              }
+              atoms.push(data);
+          } else {
+              Err("Atom data is incomplete.")?;
+          }
+      }
+
+      assert!(atoms.len() == natoms);
+
+      // 4. create frame
+      let mut frame = Frame::new();
+      frame.timestep = timestep;
+      let fragments = fragments_from_atoms(&atoms);
+      frame.fragments = fragments;
+
+      Ok(frame)
+  }
+#+end_src
+
+***** on line basis
+#+name: 39637608-12b2-4724-ac38-cfc5d4f9c990
+#+begin_src rust
+  fn parse_terse_bonds_file_single_line(line: &str) -> (f64, Vec<usize>) {
+      let mut attrs = line.split_whitespace();
+      let first = attrs.nth(0).unwrap();
+      let charge:f64 = first.parse().unwrap();
+      let neighbors:Vec<usize> = attrs.map(|x| x.parse::<usize>().unwrap()).collect();
+
+      (charge, neighbors)
+  }
+#+end_src
+
+#+name: b0d25b51-fbb3-460a-882f-3cdb7c6f6619
+#+begin_src rust
+  #[test]
+  fn test_parse_terse_bonds_line() {
+      let s = "0.007 8 9 16 896 1017 1016 905 904 120 121 1 112 128";
+      let (charge, neighbors) = parse_terse_bonds_file_single_line(&s);
+      assert_eq!(0.007, charge);
+      assert_eq!(13, neighbors.len());
+      assert_eq!(8, neighbors[0]);
+  }
+#+end_src
+
 **** TODO bonds file
 从bonds文件读入不同timestep时对应的键连信息.
 
@@ -2502,136 +2760,6 @@ References
       }
       show_fragments(&gr, &mapping_symbols);
       Ok(())
-  }
-#+end_src
-
-**** simplified bonds file
-解释reaxa生成的精减版文件.
-***** on file basis
-#+name: 1cb4fcf1-d093-41ce-a011-f88a95c9bf7b
-#+begin_src rust
-  fn parse_terse_bonds_file (path: &Path, symbols: &HashMap<usize, String>)
-                             -> Result<Vec<Frame>, Box<Error>>
-  {
-      // create file handler and a buffle reader
-      let fp = File::open(path)?;
-      let mut reader = BufReader::new(fp);
-      let mut lines_iter = reader.lines().peekable();
-
-      // parse data
-      let mut timestep = 0;
-      let mut natoms = 0;
-      let mut frames = Vec::new();
-      loop {
-          if lines_iter.peek().is_none() {
-              eprintln!("reached the end of the file: {}", path.display());
-              break;
-          }
-
-          // process a single frame
-          let frame = parse_terse_bonds_file_single_frame(&mut lines_iter, &symbols)?;
-          eprintln!("timestep {:}, done.", frame.timestep);
-          eprintln!("fragments {:?}", frame.fragments);
-          // // for test
-          // if frame.timestep > 5000_usize {
-          //     break;
-          // }
-          frames.push(frame);
-      }
-
-      Ok(frames)
-  }
-#+end_src
-
-***** on frame basis
-读入不同原子对应的电荷及connectivity.
-简化版中:
-- 以行数来定原子index.
-- 第一列为浮点数, 对应partial charge
-- 其后几列为与当前原子直接成键的所有原子对应的编号数据. 该数据为键连原子编号与当
-  前原子编号之差, 即index - current
-
-#+name: 5f005858-636b-4d77-aca5-e6be1baca10a
-#+begin_src rust
-  fn parse_terse_bonds_file_single_frame<I> (
-      lines_iter: &mut I,
-      symbols: &HashMap<usize, String>) -> Result<Frame, Box<Error>>
-      where I: Iterator<Item=io::Result<String>>,
-  {
-      // 1. read current timestep
-      let mut timestep = 0;
-      let label = "# Timestep";
-      if let Some(line) = lines_iter.next() {
-          let line = line?;
-          timestep = get_int_data_from_comment_line(&line, &label)?;
-      } else {
-          Err("Failed to read timestep!")?;
-      }
-
-      // 2. read number of atoms
-      let mut natoms = 0;
-          let label = "# Number of particles";
-      if let Some(line) = lines_iter.next() {
-          let line = line?;
-          natoms = get_int_data_from_comment_line(&line, &label)?;
-      } else {
-          Err("Failed to read number of atoms!")?;
-      }
-
-      // 3. read connectivity for each atom
-      let mut atoms = Vec::new();
-      assert!(natoms > 0);
-      for n in 1..natoms+1 {
-          let mut data = AtomData::new();
-          if let Some(line) = lines_iter.next() {
-              let line = line?;
-              let (charge, neighbors) = parse_terse_bonds_file_single_line(&line);
-              data.index = n;
-              data.charge = charge;
-              data.symbol = symbols.get(&data.index).unwrap().to_string();
-              for x in neighbors {
-                  data.neighbors.push(x+n);
-              }
-              atoms.push(data);
-          } else {
-              Err("Atom data is incomplete.")?;
-          }
-      }
-
-      assert!(atoms.len() == natoms);
-
-      // 4. create frame
-      let mut frame = Frame::new();
-      frame.timestep = timestep;
-      let fragments = fragments_from_atoms(&atoms);
-      frame.fragments = fragments;
-
-      Ok(frame)
-  }
-#+end_src
-
-***** on line basis
-#+name: 39637608-12b2-4724-ac38-cfc5d4f9c990
-#+begin_src rust
-  fn parse_terse_bonds_file_single_line(line: &str) -> (f64, Vec<usize>) {
-      let mut attrs = line.split_whitespace();
-      let first = attrs.nth(0).unwrap();
-      let charge:f64 = first.parse().unwrap();
-      let neighbors:Vec<usize> = attrs.map(|x| x.parse::<usize>().unwrap()).collect();
-
-      (charge, neighbors)
-  }
-#+end_src
-
-#+name: b0d25b51-fbb3-460a-882f-3cdb7c6f6619
-#+begin_src rust
-  #[test]
-  fn test_parse_terse_bonds_line() {
-      let s = "0.007 8 9 16 896 1017 1016 905 904 120 121 1 112 128";
-      let (charge, neighbors) = parse_terse_bonds_file_single_line(&s);
-      assert_eq!(0.007, charge);
-      assert_eq!(13, neighbors.len());
-      assert_eq!(8, neighbors[0]);
   }
 #+end_src
 
