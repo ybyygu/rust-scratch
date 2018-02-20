@@ -4,6 +4,7 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [1/10]
+** [2018-02-19 Mon] rust升级至1.24, 新功能: 增量编译. 调代码效率可以高一些了.
 ** [2018-02-19 Mon] cgmath基本用法
 : np.linalg.norm => vector.magnitude()
 : mat.T => mat.transpose()
@@ -24,7 +25,7 @@
 ** TODO [2018-02-17 Sat] ovito输出至POSCAR后 原子次序会重排. 需要结构提取功能.
 需要写一个能输出CIF文件的程序. 保留原子次序和键连关系.
 
-** [2018-02-16 Fri] peek的用法
+** [2018-02-16 Fri] iterator.peek的用法
 很容易报错:
 : cannot move out of borrowed content
 
@@ -84,6 +85,9 @@ CLOSED: [2018-02-13 Tue 12:34]
 
 ** TODO [2018-02-02 Fri] 错误处理
 - [[https://doc.rust-lang.org/book/second-edition/ch09-02-recoverable-errors-with-result.html#a-shortcut-for-propagating-errors-][A Shortcut for Propagating Errors: ?]]
+
+函数返回类型:
+: -> Result<(), Box(Error)>
 
 ** [2018-02-01 Thu] Eq与PartialEq
 - [[https://doc.rust-lang.org/std/cmp/trait.PartialEq.html][std::cmp::PartialEq - Rust]]
@@ -540,8 +544,6 @@ fn sqrt(x: f64) -> f64 {
 #+begin_src shell :results output
   cargo run
 #+end_src
-
-#+RESULTS: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
 
 ** hamming distance
 *** test
@@ -1030,22 +1032,40 @@ create a terse version of .bonds file
   use std::path::Path;
 
   use clap::{App, Arg, AppSettings};
-  use reaxb::{parse_lammps_files, write_formated_text};
+  use reaxb::{extract_frame, analyze_frames};
 #+end_src
 
 **** main
 提供命令行操作, 读入待分析文件路径.
+***** Config
+#+name: 25390ea6-8bf3-4083-a422-f9e628299efc
+#+begin_src rust
+  struct Config {
+      filename: String,
+      extract: bool,
+      timestep: usize,
+  }
+
+  impl Config {
+      fn new() -> Self {
+          Config {
+              filename: String::new(),
+              extract: false,
+              timestep: 0,
+          }
+      }
+  }
+#+end_src
+
+***** fn parse_args
 #+name: b8ea57f0-b549-4fa0-ac1a-abf83009009e
 #+BEGIN_SRC rust
   /// get file name from command line argument
-  fn get_filename() -> Result<String, String> {
-
-      let app = App::new("myapp");
-
-      let matches = App::new("MyApp")
+  fn parse_args() -> Result<Config, Box<Error>> {
+      let matches = App::new("reaxb")
           .version("0.1")
           .author("Wenping Guo <winpng@gmail.com>")
-          .about("lammps/reaxff reaction trajectory analysis")
+          .about("tools for lammps/reaxff reaction trajectory analysis")
           .arg(
               Arg::with_name("debug")
                   .help("debug switch")
@@ -1054,25 +1074,62 @@ create a terse version of .bonds file
                   .short("d")
           )
           .arg(
+              Arg::with_name("extract")
+                  .help("extract structure on a specific timestep")
+                  .long("extract")
+                  .short("e")
+                  .value_name("TIMESTEP")
+                  .takes_value(true)
+          )
+          .arg(
               Arg::with_name("input")
                   .help("set input file name")
+                  .value_name("FILE")
                   .index(1)
+                  .required(true)
           )
           .setting(AppSettings::ArgRequiredElseHelp)
           .get_matches();
-      let r = matches.value_of("input");
-      match r {
-          Some(v) => Ok(v.to_string()),
-          None => Err("bad input".to_string())
+
+      let mut config = Config::new();
+      if let Some(r) = matches.value_of("extract") {
+          config.extract = true;
+          match r.parse::<usize>() {
+              Ok(v) => {
+                  config.timestep = v;
+              }
+              Err(why) => {
+                  let msg = format!("timestep is expected to be integer, but found: {}", r);
+                  Err(msg)?;
+              },
+          }
       }
+
+      if let Some(r) = matches.value_of("input") {
+          config.filename = r.to_string();
+      } else {
+          Err("input file is required!")?;
+      }
+
+      Ok(config)
   }
 
-  fn main() {
-      let filename = get_filename().unwrap();
-      let frames = parse_lammps_files(&filename).unwrap();
-      write_formated_text(&frames, "test.txt");
-  }
 #+END_SRC
+
+***** fn main
+#+name: 0176a8ca-12d4-4334-9fa5-6093ceddb854
+#+begin_src rust
+  fn main() {
+      let config = parse_args().unwrap();
+      if config.extract {
+          println!("extract structure on timestep {} from file: {}", config.timestep, config.filename);
+          extract_frame(&config.filename, config.timestep).unwrap();
+      } else {
+          println!("fragment analysis of trajectory file: {:}", config.filename);
+          analyze_frames(&config.filename);
+      }
+  }
+#+end_src
 
 *** lib.rs
 :PROPERTIES:
@@ -1093,7 +1150,7 @@ create a terse version of .bonds file
   mod lammps;
 
   use std::collections::HashMap;
-  pub use lammps::{parse_lammps_files, write_formated_text};
+  pub use lammps::{extract_frame, analyze_frames};
 #+end_src
 
 **** structs
@@ -1111,14 +1168,12 @@ create a terse version of .bonds file
       pub fn new() -> Frame{
           let map1: HashMap<String, usize> = HashMap::new();
           let map2: HashMap<usize, [f64; 3]> = HashMap::new();
-          let vec1: Vec<AtomData> = Vec::new();
 
           Frame {
               timestep: 0,
               natoms: 0,
               fragments: map1,
               positions: map2,
-              atoms: vec1,
               cell: [[0_f64; 3]; 3],
           }
       }
@@ -1173,23 +1228,29 @@ create a terse version of .bonds file
 #+begin_src rust
   // data structure for a single frame
   pub struct TrajectoryFrame {
-      pub timestep: usize,            // current timestep
-      pub atoms: Vec<AtomData>,
-      pub cell: [[f64; 3]; 3],
+      pub timestep : usize,            // current timestep
+      pub natoms   : usize,
+      pub cell     : [[f64; 3]; 3],
+      pub symbols  : HashMap<usize, String>,
+      pub positions: HashMap<usize, [f64; 3]>,
+
   }
 #+end_src
 
 #+name: 8a0cf3ff-227f-493b-aa5e-20ac3cac8f5c
 #+begin_src rust
   impl TrajectoryFrame {
-      fn new() -> Self {
-          let atoms:Vec<AtomData> = Vec::new();
+      pub fn new() -> Self {
+          let positions: HashMap<usize, [f64; 3]> = HashMap::new();
+          let symbols  : HashMap<usize, String> = HashMap::new();
           let cell = [[0_f64; 3]; 3];
 
           TrajectoryFrame {
-              timestep: 0,
-              atoms: atoms,
-              cell: cell,
+              timestep : 0,
+              natoms   : 0,
+              positions: positions,
+              symbols  : symbols,
+              cell     : cell,
           }
       }
   }
@@ -1313,10 +1374,13 @@ frame里需要具有的信息:
 - neighbors
 - symbols
 - cell
+
+cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
+
 ***** src
 #+name: fb3fb6d8-9ae3-4b29-a7c6-92c61776c867
 #+begin_src rust
-  fn write_as_cif(frame: TrajectoryFrame, path: &Path) {
+  pub fn write_as_cif(frame: TrajectoryFrame, path: &Path) {
       let mut lines = String::new();
 
       // meta inforation
@@ -1356,11 +1420,12 @@ frame里需要具有的信息:
       lines.push_str("_atom_site_fract_y\n");
       lines.push_str("_atom_site_fract_z\n");
 
-      for a in frame.atoms {
-          let name = format!("{}{}", a.symbol, a.index);
-          let coords = Vector3::new(a.position[0], a.position[1], a.position[2]);
+      for (index, position) in frame.positions {
+          let symbol = frame.symbols.get(&index).unwrap();
+          let name = format!("{}{}", symbol, index);
+          let coords = Vector3::new(position[0], position[1], position[2]);
           let v = cell.transpose().invert().unwrap()*coords;
-          let s = format!("{:4}{:6}{:12.5}{:12.5}{:12.5}\n", a.symbol, name, v.x, v.y, v.z);
+          let s = format!("{:4}{:6}{:12.5}{:12.5}{:12.5}\n", symbol, name, v.x, v.y, v.z);
           lines.push_str(&s);
       }
 
@@ -1387,18 +1452,15 @@ frame里需要具有的信息:
       let cell = [[15.3643, 0.0, 0.0], [4.5807, 15.5026, 0.0], [0.0, 0.0, 17.4858]];
       frame.cell = cell;
 
-      let mut atoms:Vec<AtomData> = Vec::new();
+      let mut positions = HashMap::new();
+      positions.insert(1, [2.1832, 1.6850, 3.8505]);
+      positions.insert(2, [6.9068, 5.0550, 0.6795]);
+      frame.positions = positions;
 
-      let mut a = AtomData::new();
-      a.index = 1;
-      a.position = [2.1832, 1.6850, 3.8505];
-      atoms.push(a);
-      let mut b = AtomData::new();
-      b.index = 2;
-      b.position = [6.9068, 5.0550, 0.6795];
-      atoms.push(b);
-
-      frame.atoms = atoms;
+      let mut symbols = HashMap::new();
+      symbols.insert(1, "C".to_string());
+      symbols.insert(2, "H".to_string());
+      frame.symbols = symbols;
 
       write_as_cif(frame, &path);
   }
@@ -1588,6 +1650,11 @@ frame里需要具有的信息:
 - 使用图论来分析某帧时的fragments(connected components), 某fragments的个数.
 - 等所有轨迹解析完成, 输出总表: timestep vs fragments (counts)
 
+附加功能:
+- 提取特定timestep的结构
+- 同时读取bonds文件中的键连信息
+- 以CIF文件格式输出
+
 **** globals
 #+name: 8da0ca06-6b0c-4d1b-8eec-827c7459cf2b
 #+begin_src rust
@@ -1601,15 +1668,67 @@ frame里需要具有的信息:
   use petgraph::prelude::*;
   use petgraph as pg;
 
-  use atoms::AtomData;
+  use atoms::{AtomData, TrajectoryFrame, write_as_cif};
   use ::Frame;
   use graph::fragments_from_atoms;
 #+end_src
 
 **** parse lammps files
-读入多个lammps文件.
+读入多个lammps文件. 问题: data, bonds, dump这三个文件名不一定相同.
+***** extract frame structure
+提出特定frame对应的结构, 生成cif文件.
+- 元素信息: symbols
+- 键连信息: bonds
+- 结构信息: dump, cell
 
-问题: data, bonds, dump这三个文件名不一定相同.
+#+name: 30c60549-db69-4b1b-b0e5-33904c16a8b9
+#+begin_src rust
+  pub fn extract_frame(filename: &str, target_timestep: usize) -> Result<(), Box<Error>>
+  {
+      // 1. guess required lammps files from input filename
+      let path = Path::new(filename);
+      let path_lammps_data = path.with_extension("data");
+      let path_lammps_dump = path.with_extension("dump");
+      let path_lammps_bonds = path.with_extension("bonds-terse");
+
+      if ! path_lammps_data.is_file() {
+          let msg = format!("data file not found: {:}", path_lammps_data.display());
+          Err(msg)?;
+      }
+      if ! path_lammps_bonds.is_file() {
+          let msg = format!("bonds file not found: {:}", path_lammps_bonds.display());
+          Err(msg)?;
+      }
+
+      if ! path_lammps_dump.is_file() {
+          let msg = format!("dump file not found: {:}", path_lammps_dump.display());
+          Err(msg)?;
+      }
+
+      // get positions from dump file
+      let mut frame = get_frame_from_lammps_dump_file(&path_lammps_dump, target_timestep)?;
+
+      // get symbols from data file
+      frame.symbols = parse_lammps_data_file(&path_lammps_data)?;
+
+      // assign connectivity
+      // let frames = parse_terse_bonds_file(&path_lammps_bonds, &symbols);
+
+      let path_ciffile = path.with_extension(".cif");
+      write_as_cif(frame, &path_ciffile);
+
+      Ok(())
+  }
+
+#+end_src
+
+***** fragment analysis
+#+name: 1d1ee6e3-9786-42f5-bc5b-e5542d5e6149
+#+begin_src rust
+  pub fn analyze_frames(filename: &str) {
+      ;
+  }
+#+end_src
 
 #+name: 2085aabc-b09b-4084-88d1-33699881e5e3
 #+begin_src rust
@@ -1634,7 +1753,6 @@ frame里需要具有的信息:
 
       // assign connectivity
       let frames = parse_terse_bonds_file(&path_lammps_bonds, &symbols);
-      let frame = get_frame_from_lammps_dump_file(&path_lammps_dump, 200);
 
       frames
   }
@@ -1675,7 +1793,6 @@ frame里需要具有的信息:
       }
   }
 #+end_src
-
 **** data file
 ***** info
 从lammps data输入文件中读入结构信息.
@@ -1829,21 +1946,21 @@ frame里需要具有的信息:
   }
 #+end_src
 **** dump file
+扩展名多数为dump, 有些也为lammpstrj等.
+
 ***** lammps dump frame
 提取特定帧对应的坐标信息.
 ****** src
 #+name: daedfe6b-34ed-4dd1-94a2-4e698a00a42c
 #+begin_src rust
-  fn get_frame_from_lammps_dump_file(path: &Path, target_timestep: usize) -> Result<Frame, Box<Error>> {
+  fn get_frame_from_lammps_dump_file (path: &Path, target_timestep: usize) -> Result<TrajectoryFrame, Box<Error>>
+  {
       let fp = File::open(path)?;
       let mut reader = BufReader::new(fp);
 
-      let mut timestep = 0;
-      let mut natoms = 0;
-      let mut frame = Frame::new();
-
-      let mut timestep = 0_usize;
+      let mut frame = TrajectoryFrame::new();
       let mut natoms = 0_usize;
+      let mut timestep = 0_usize;
       let mut buf = String::new();
       loop {
           // 0. sanity check
@@ -1887,6 +2004,9 @@ frame里需要具有的信息:
                   }
               }
           } else if timestep == target_timestep {
+              frame.timestep = timestep;
+              frame.natoms = natoms;
+
               buf.clear();
               // 3.1 the lammps box
               for _ in 0..4 {
@@ -1906,7 +2026,7 @@ frame里需要具有的信息:
                       Err("Expect more lines: failed to read all atom records!")?;
                   }
               }
-              let positions = get_lammps_dump_atoms(&buf, natoms)?;
+              let positions = get_lammps_dump_positions(&buf, natoms)?;
               frame.positions = positions;
               // ignore remaining lines
               break;
@@ -2126,7 +2246,7 @@ References
 ****** src
 #+name: dd0f9789-eb7f-492a-aa0d-24a76d346f76
 #+begin_src rust
-  fn get_lammps_dump_atoms(txt: &str, natoms: usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
+  fn get_lammps_dump_positions(txt: &str, natoms: usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
       let mut lines_iter = txt.lines();
       if let Some(line) = lines_iter.next() {
           assert!(line.starts_with("ITEM: ATOMS id type x y z"));
@@ -2134,7 +2254,7 @@ References
           Err("failed to read atoms header.")?;
       }
 
-      let mut atoms = HashMap::new();
+      let mut positions: HashMap<usize, [f64; 3]> = HashMap::new();
       for _ in 0..natoms {
           if let Some(line) = lines_iter.next() {
               let mut attrs:Vec<_> = line.split_whitespace().collect();
@@ -2143,13 +2263,13 @@ References
               let x:f64 = attrs[2].parse().unwrap();
               let y:f64 = attrs[3].parse().unwrap();
               let z:f64 = attrs[4].parse().unwrap();
-              atoms.insert(index, [x, y, z]);
+              positions.insert(index, [x, y, z]);
           } else {
               Err("atom records are incomplete")?;
           }
       }
 
-      Ok(atoms)
+      Ok(positions)
   }
 #+end_src
 
@@ -2157,7 +2277,7 @@ References
 #+name: afe1d362-438a-4e03-939d-50e9eaac21e1
 #+begin_src rust
   #[test]
-  fn test_parse_dump_atoms() {
+  fn test_parse_dump_positions() {
       let txt = "ITEM: ATOMS id type x y z
   1 1 3.77622 3.9054 0.009267
   2 1 3.77622 3.9054 2.90503
@@ -2166,9 +2286,9 @@ References
   5 2 4.73984 2.09641 0.131493";
 
       let natoms = 5_usize;
-      let atoms = get_lammps_dump_atoms(&txt, natoms).unwrap();
-      assert_relative_eq!(3.77622, &atoms[&1_usize][0]);
-      assert_relative_eq!(0.131493, &atoms[&5_usize][2]);
+      let positions = get_lammps_dump_positions(&txt, natoms).unwrap();
+      assert_relative_eq!(3.77622, &positions[&1_usize][0]);
+      assert_relative_eq!(0.131493, &positions[&5_usize][2]);
   }
 #+end_src
 
