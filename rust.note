@@ -1420,7 +1420,8 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       lines.push_str("_atom_site_fract_y\n");
       lines.push_str("_atom_site_fract_z\n");
 
-      for (index, position) in frame.positions {
+      for index in 1..(frame.natoms+1) {
+          let position = frame.positions.get(&index).unwrap();
           let symbol = frame.symbols.get(&index).unwrap();
           let name = format!("{}{}", symbol, index);
           let coords = Vector3::new(position[0], position[1], position[2]);
