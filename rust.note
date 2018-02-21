@@ -1045,17 +1045,19 @@ create a terse version of .bonds file
 #+name: 25390ea6-8bf3-4083-a422-f9e628299efc
 #+begin_src rust
   struct Config {
-      filename: String,
-      extract: bool,
-      timestep: usize,
+      inpfile  : Option<String>,
+      extract  : bool,
+      timestep : usize,
+      outfile  : Option<String>,
   }
 
   impl Config {
       fn new() -> Self {
           Config {
-              filename: String::new(),
-              extract: false,
-              timestep: 0,
+              inpfile  : None,
+              extract  : false,
+              timestep : 0,
+              outfile  : None,
           }
       }
   }
@@ -1088,8 +1090,15 @@ create a terse version of .bonds file
           .arg(
               Arg::with_name("input")
                   .help("set input file name")
-                  .value_name("FILE")
+                  .value_name("INPUT-FILE")
                   .index(1)
+                  .required(true)
+          )
+          .arg(
+              Arg::with_name("output")
+                  .help("set output file name")
+                  .value_name("OUTPUT-FILE")
+                  .index(2)
                   .required(true)
           )
           .setting(AppSettings::ArgRequiredElseHelp)
@@ -1110,9 +1119,15 @@ create a terse version of .bonds file
       }
 
       if let Some(r) = matches.value_of("input") {
-          config.filename = r.to_string();
+          config.inpfile = Some(r.to_string());
       } else {
           Err("input file is required!")?;
+      }
+
+      if let Some(r) = matches.value_of("output") {
+          config.outfile = Some(r.to_string());
+      } else {
+          Err("output file is required!")?;
       }
 
       Ok(config)
@@ -1125,12 +1140,32 @@ create a terse version of .bonds file
 #+begin_src rust
   fn main() {
       let config = parse_args().unwrap();
+      let inpfile = config.inpfile.unwrap();
+      let outfile = config.outfile.unwrap();
+
       if config.extract {
-          println!("extract structure on timestep {} from file: {}", config.timestep, config.filename);
-          extract_frame(&config.filename, config.timestep).unwrap();
+          println!("extract structure on timestep {} from file: {}", config.timestep, inpfile);
+          println!("structure will be saved as: {}", &outfile);
+
+          match extract_frame(&inpfile, config.timestep, &outfile) {
+              Ok(r) => {
+                  println!("Done.");
+              },
+              Err(why) => {
+                  println!("Failed: {:}", why);
+              },
+          }
       } else {
-          println!("fragment analysis of trajectory file: {:}", config.filename);
-          analyze_frames(&config.filename);
+          println!("fragment analysis of trajectory file: {:}", inpfile);
+          println!("analysis report will be saved as: {:}", outfile);
+          match analyze_frames(&inpfile, &outfile) {
+              Ok(r) => {
+                  println!("Done.");
+              },
+              Err(why) => {
+                  println!("Failed: {:}", why);
+              },
+          }
       }
   }
 #+end_src
@@ -1772,7 +1807,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 :END:
 总体思路:
 - 从data文件中读入总原子数, 原子对应的原子类型(元素符号)
-- 从简化的bonds文件中读入某帧时的timestep, 键链关系.
+- 从简化的bonds文件中读入某帧时的timestep, 键连关系.
 - 使用图论来分析某帧时的fragments(connected components), 某fragments的个数.
 - 等所有轨迹解析完成, 输出总表: timestep vs fragments (counts)
 
@@ -1809,7 +1844,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 
 #+name: 30c60549-db69-4b1b-b0e5-33904c16a8b9
 #+begin_src rust
-  pub fn extract_frame(filename: &str, target_timestep: usize) -> Result<(), Box<Error>>
+  pub fn extract_frame(filename: &str, target_timestep: usize, ciffile: &str) -> Result<(), Box<Error>>
   {
       // 1. guess required lammps files from input filename
       let path = Path::new(filename);
@@ -1840,7 +1875,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       // assign connectivity
       frame.neighbors = get_connectivity_from_terse_bonds_file(&path_lammps_bonds, target_timestep)?;
 
-      let path_ciffile = path.with_extension(".cif");
+      let path_ciffile = Path::new(ciffile);
       write_as_cif(frame, &path_ciffile);
 
       Ok(())
@@ -1850,8 +1885,11 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 ***** fragment analysis
 #+name: 1d1ee6e3-9786-42f5-bc5b-e5542d5e6149
 #+begin_src rust
-  pub fn analyze_frames(filename: &str) {
-      ;
+  pub fn analyze_frames(filename: &str, outfile: &str) -> Result<(), Box<Error>>{
+      let frames = parse_lammps_files(filename)?;
+      write_formated_text(&frames, outfile);
+
+      Ok(())
   }
 #+end_src
 
