@@ -1049,6 +1049,7 @@ create a terse version of .bonds file
       extract  : bool,
       timestep : usize,
       outfile  : Option<String>,
+      maxcols  : usize,
   }
 
   impl Config {
@@ -1058,6 +1059,7 @@ create a terse version of .bonds file
               extract  : false,
               timestep : 0,
               outfile  : None,
+              maxcols  : 100,
           }
       }
   }
@@ -1085,6 +1087,14 @@ create a terse version of .bonds file
                   .long("extract")
                   .short("e")
                   .value_name("TIMESTEP")
+                  .takes_value(true)
+          )
+          .arg(
+              Arg::with_name("maxcols")
+                  .help("set max columns in fragment analysis report")
+                  .long("maxcols")
+                  .short("m")
+                  .value_name("NCOLUMNS")
                   .takes_value(true)
           )
           .arg(
@@ -1130,6 +1140,10 @@ create a terse version of .bonds file
           Err("output file is required!")?;
       }
 
+      if let Some(r) = matches.value_of("maxcols") {
+          config.maxcols = r.parse().unwrap();
+      }
+
       Ok(config)
   }
 
@@ -1158,7 +1172,7 @@ create a terse version of .bonds file
       } else {
           println!("fragment analysis of trajectory file: {:}", inpfile);
           println!("analysis report will be saved as: {:}", outfile);
-          match analyze_frames(&inpfile, &outfile) {
+          match analyze_frames(&inpfile, &outfile, config.maxcols) {
               Ok(r) => {
                   println!("Done.");
               },
@@ -1821,7 +1835,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 #+begin_src rust
   use std::fs::File;
   use std::error::Error;
-  use std::io::{self, BufReader};
+  use std::io::{self, BufReader, BufWriter};
   use std::io::prelude::*;
   use std::collections::HashMap;
   use std::path::Path;
@@ -1885,9 +1899,9 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 ***** fragment analysis
 #+name: 1d1ee6e3-9786-42f5-bc5b-e5542d5e6149
 #+begin_src rust
-  pub fn analyze_frames(filename: &str, outfile: &str) -> Result<(), Box<Error>>{
+  pub fn analyze_frames(filename: &str, outfile: &str, maxcols: usize) -> Result<(), Box<Error>>{
       let frames = parse_lammps_files(filename)?;
-      write_formated_text(&frames, outfile);
+      write_formated_text(&frames, outfile, maxcols)?;
 
       Ok(())
   }
@@ -1923,9 +1937,10 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 
 #+name: 4540ac95-d7d0-42a2-aef3-bcee0abc5586
 #+begin_src rust
-  pub fn write_formated_text(frames: &Vec<Frame>, outfile: &str) {
-      let path = Path::new(outfile);
-      // let writer = BufWriter(path);
+  pub fn write_formated_text(frames: &Vec<Frame>, outfile: &str, max_columns: usize) -> Result<(), Box<Error>>{
+      // create output file
+      let f = File::create(outfile)?;
+      let mut writer = BufWriter::new(f);
 
       let mut species:HashMap<String, usize> = HashMap::new();
       for frame in frames {
@@ -1940,20 +1955,28 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       count_vec.reverse();
 
       let vs:Vec<String> = count_vec.iter().map(|x| x.0.to_string()).collect();
-      print!("Timestep ");
-      let max_columns = 100;
-      let vs = &vs[..max_columns];
-      println!("{:}", vs.join(" "));
+      writer.write("Timestep ".as_bytes());
+
+      let mut mc = vs.len();
+      if max_columns < mc {
+          mc = max_columns;
+      }
+      let vs = &vs[..mc];
+      writer.write(format!("{:}\n", vs.join(" ")).as_bytes());
 
       for frame in frames {
-          print!("{:^width$}", frame.timestep, width="Timestep ".len());
+          let s = format!("{:^width$}", frame.timestep, width="Timestep ".len());
+          writer.write(s.as_bytes());
           let mut lst = Vec::new();
           for k in vs.iter() {
               let count = frame.fragments.get(k).unwrap_or(&0_usize);
               lst.push(format!("{:^width$}", count, width=k.len()));
           }
-          println!("{}", lst.join(" "));
+          let s = format!("{}\n", lst.join(" "));
+          writer.write(s.as_bytes());
       }
+
+      Ok(())
   }
 #+end_src
 **** data file
