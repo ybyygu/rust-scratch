@@ -1163,7 +1163,7 @@ create a terse version of .bonds file
 
           match extract_frame(&inpfile, config.timestep, &outfile) {
               Ok(r) => {
-                  println!("Done.");
+                  println!("Done. CIF file saved as {}.", outfile);
               },
               Err(why) => {
                   println!("Failed: {:}", why);
@@ -1171,10 +1171,9 @@ create a terse version of .bonds file
           }
       } else {
           println!("fragment analysis of trajectory file: {:}", inpfile);
-          println!("analysis report will be saved as: {:}", outfile);
           match analyze_frames(&inpfile, &outfile, config.maxcols) {
               Ok(r) => {
-                  println!("Done.");
+                  println!("Done. report file saved as {}", outfile);
               },
               Err(why) => {
                   println!("Failed: {:}", why);
@@ -1242,6 +1241,10 @@ create a terse version of .bonds file
 #+begin_src rust
   use std::collections::HashMap;
   use std::path::Path;
+  use std::error::Error;
+  use std::fs::File;
+  use std::io::{self, BufReader, BufWriter};
+  use std::io::Write;
 #+end_src
 
 **** atom
@@ -1496,7 +1499,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 ***** src
 #+name: fb3fb6d8-9ae3-4b29-a7c6-92c61776c867
 #+begin_src rust
-  pub fn write_as_cif(frame: TrajectoryFrame, path: &Path) {
+  pub fn write_as_cif(frame: TrajectoryFrame, path: &Path) -> Result<(), Box<Error>>{
       let mut lines = String::new();
 
       // meta inforation
@@ -1585,7 +1588,12 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
           }
       }
 
-      println!("{:}", lines);
+      // save as a file
+      let f = File::create(path)?;
+      let mut writer = BufWriter::new(&f);
+      writer.write_all(&lines.as_bytes())?;
+
+      Ok(())
   }
 #+end_src
 
@@ -1889,8 +1897,8 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
       // assign connectivity
       frame.neighbors = get_connectivity_from_terse_bonds_file(&path_lammps_bonds, target_timestep)?;
 
-      let path_ciffile = Path::new(ciffile);
-      write_as_cif(frame, &path_ciffile);
+      let path = Path::new(ciffile);
+      write_as_cif(frame, &path);
 
       Ok(())
   }
