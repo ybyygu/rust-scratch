@@ -1005,7 +1005,7 @@ create a terse version of .bonds file
 #+BEGIN_SRC conf :tangle reaxb/Cargo.toml
   [package]
   name = "reaxb"
-  version = "0.1.0"
+  version = "0.1.1"
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
   [dependencies]
@@ -1071,7 +1071,7 @@ create a terse version of .bonds file
   /// get file name from command line argument
   fn parse_args() -> Result<Config, Box<Error>> {
       let matches = App::new("reaxb")
-          .version("0.1")
+          .version("0.1.1")
           .author("Wenping Guo <winpng@gmail.com>")
           .about("tools for lammps/reaxff reaction trajectory analysis")
           .arg(
@@ -1828,6 +1828,7 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 :header-args: :tangle reaxb/src/lammps.rs
 :END:
 总体思路:
+- 如果bonds-terse文件不存在, 自动读取bonds文件, 生成简化版.
 - 从data文件中读入总原子数, 原子对应的原子类型(元素符号)
 - 从简化的bonds文件中读入某帧时的timestep, 键连关系.
 - 使用图论来分析某帧时的fragments(connected components), 某fragments的个数.
@@ -2141,7 +2142,6 @@ cif需要输出bonds信息, 包括边界原子与邻近镜像原子的成键.
 #+end_src
 **** dump file
 扩展名多数为dump, 有些也为lammpstrj等.
-
 ***** lammps dump frame
 提取特定帧对应的坐标信息.
 ****** src
@@ -2455,21 +2455,40 @@ References
 #+begin_src rust
   fn get_lammps_dump_positions(txt: &str, natoms: usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
       let mut lines_iter = txt.lines();
+      let prefix = "ITEM: ATOMS";
+
+      // 1. sanity check and get header labels
+      let mut labels = Vec::new();
       if let Some(line) = lines_iter.next() {
-          assert!(line.starts_with("ITEM: ATOMS id type x y z"));
+          if line.starts_with(&prefix) {
+              labels = line[prefix.len()..].split_whitespace().collect();
+              println!("{:?}", labels);
+          } else {
+              Err(format!("Expected header not found: {}", &line))?;
+          }
       } else {
           Err("failed to read atoms header.")?;
       }
 
+      // 2. assign values according to header labels
       let mut positions: HashMap<usize, [f64; 3]> = HashMap::new();
       for _ in 0..natoms {
           if let Some(line) = lines_iter.next() {
               let mut attrs:Vec<_> = line.split_whitespace().collect();
-              assert!(attrs.len() >= 5, line.to_string());
-              let index:usize = attrs[0].parse().unwrap();
-              let x:f64 = attrs[2].parse().unwrap();
-              let y:f64 = attrs[3].parse().unwrap();
-              let z:f64 = attrs[4].parse().unwrap();
+              assert!(attrs.len() == labels.len(), line.to_string());
+              let mut index = 0_usize;
+              let mut x = 0_f64;
+              let mut y = 0_f64;
+              let mut z = 0_f64;
+              for (k, v) in labels.iter().zip(attrs.iter()) {
+                  match k {
+                      &"x"  => x = v.parse().unwrap(),
+                      &"y"  => y = v.parse().unwrap(),
+                      &"z"  => z = v.parse().unwrap(),
+                      &"id" => index = v.parse().unwrap(),
+                      _     => (),
+                  }
+              }
               positions.insert(index, [x, y, z]);
           } else {
               Err("atom records are incomplete")?;
@@ -2494,8 +2513,19 @@ References
 
       let natoms = 5_usize;
       let positions = get_lammps_dump_positions(&txt, natoms).unwrap();
-      assert_relative_eq!(3.77622, &positions[&1_usize][0]);
-      assert_relative_eq!(0.131493, &positions[&5_usize][2]);
+      assert_relative_eq!(3.77622, &positions[&1_usize][0], epsilon=1e-4);
+      assert_relative_eq!(0.131493, &positions[&5_usize][2], epsilon=1e-4);
+
+      let txt = "ITEM: ATOMS x y z type id
+  0.1832399964 1.684999943 3.850500107 1 1
+  4.906760216 5.054999828 0.6794999838 1 2
+  2.361759901 5.054999828 1.585500002 1 3
+  2.728240013 1.684999943 2.944499969 1 4
+  0.9467399716 0.4246200025 1.485839963 1 5 ";
+
+      let positions = get_lammps_dump_positions(&txt, 5_usize).unwrap();
+      assert_relative_eq!(0.183239996, &positions[&1_usize][0], epsilon=1e-4);
+      assert_relative_eq!(4.906760216, &positions[&2_usize][0], epsilon=1e-4);
   }
 #+end_src
 

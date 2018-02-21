@@ -39,7 +39,7 @@ impl Config {
 /// get file name from command line argument
 fn parse_args() -> Result<Config, Box<Error>> {
     let matches = App::new("reaxb")
-        .version("0.1")
+        .version("0.1.1")
         .author("Wenping Guo <winpng@gmail.com>")
         .about("tools for lammps/reaxff reaction trajectory analysis")
         .arg(

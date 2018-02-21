@@ -46,8 +46,8 @@ pub fn extract_frame(filename: &str, target_timestep: usize, ciffile: &str) -> R
     // assign connectivity
     frame.neighbors = get_connectivity_from_terse_bonds_file(&path_lammps_bonds, target_timestep)?;
 
-    let path_ciffile = Path::new(ciffile);
-    write_as_cif(frame, &path_ciffile);
+    let path = Path::new(ciffile);
+    write_as_cif(frame, &path);
 
     Ok(())
 }
@@ -523,21 +523,40 @@ fn test_lammps_box() {
 // [[file:~/Workspace/Programming/rust-scratch/rust.note::dd0f9789-eb7f-492a-aa0d-24a76d346f76][dd0f9789-eb7f-492a-aa0d-24a76d346f76]]
 fn get_lammps_dump_positions(txt: &str, natoms: usize) -> Result<HashMap<usize, [f64; 3]>, Box<Error>>{
     let mut lines_iter = txt.lines();
+    let prefix = "ITEM: ATOMS";
+
+    // 1. sanity check and get header labels
+    let mut labels = Vec::new();
     if let Some(line) = lines_iter.next() {
-        assert!(line.starts_with("ITEM: ATOMS id type x y z"));
+        if line.starts_with(&prefix) {
+            labels = line[prefix.len()..].split_whitespace().collect();
+            println!("{:?}", labels);
+        } else {
+            Err(format!("Expected header not found: {}", &line))?;
+        }
     } else {
         Err("failed to read atoms header.")?;
     }
 
+    // 2. assign values according to header labels
     let mut positions: HashMap<usize, [f64; 3]> = HashMap::new();
     for _ in 0..natoms {
         if let Some(line) = lines_iter.next() {
             let mut attrs:Vec<_> = line.split_whitespace().collect();
-            assert!(attrs.len() >= 5, line.to_string());
-            let index:usize = attrs[0].parse().unwrap();
-            let x:f64 = attrs[2].parse().unwrap();
-            let y:f64 = attrs[3].parse().unwrap();
-            let z:f64 = attrs[4].parse().unwrap();
+            assert!(attrs.len() == labels.len(), line.to_string());
+            let mut index = 0_usize;
+            let mut x = 0_f64;
+            let mut y = 0_f64;
+            let mut z = 0_f64;
+            for (k, v) in labels.iter().zip(attrs.iter()) {
+                match k {
+                    &"x"  => x = v.parse().unwrap(),
+                    &"y"  => y = v.parse().unwrap(),
+                    &"z"  => z = v.parse().unwrap(),
+                    &"id" => index = v.parse().unwrap(),
+                    _     => (),
+                }
+            }
             positions.insert(index, [x, y, z]);
         } else {
             Err("atom records are incomplete")?;
@@ -560,8 +579,19 @@ fn test_parse_dump_positions() {
 
     let natoms = 5_usize;
     let positions = get_lammps_dump_positions(&txt, natoms).unwrap();
-    assert_relative_eq!(3.77622, &positions[&1_usize][0]);
-    assert_relative_eq!(0.131493, &positions[&5_usize][2]);
+    assert_relative_eq!(3.77622, &positions[&1_usize][0], epsilon=1e-4);
+    assert_relative_eq!(0.131493, &positions[&5_usize][2], epsilon=1e-4);
+
+    let txt = "ITEM: ATOMS x y z type id
+0.1832399964 1.684999943 3.850500107 1 1
+4.906760216 5.054999828 0.6794999838 1 2
+2.361759901 5.054999828 1.585500002 1 3
+2.728240013 1.684999943 2.944499969 1 4
+0.9467399716 0.4246200025 1.485839963 1 5 ";
+
+    let positions = get_lammps_dump_positions(&txt, 5_usize).unwrap();
+    assert_relative_eq!(0.183239996, &positions[&1_usize][0], epsilon=1e-4);
+    assert_relative_eq!(4.906760216, &positions[&2_usize][0], epsilon=1e-4);
 }
 // afe1d362-438a-4e03-939d-50e9eaac21e1 ends here
 
