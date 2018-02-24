@@ -9,5 +9,6 @@ base64 = "*"
 clap = "*"
 zip = "*"
 nom = "*"
+timeit = "*"
 petgraph = "*"
 # 7935cdce-84b1-4d22-a63d-7d0a8580a279 ends here

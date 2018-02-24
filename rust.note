@@ -4,11 +4,20 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [2/10]
+** [2018-02-22 Thu] cgmath vs nalgebra
+- 不同线性代数相关库的比较 [[https://www.reddit.com/r/rust/comments/63wts9/why_are_there_so_many_linear_algebra_crates_which/][URL]]
+- cgmath更基础一些, 比如没有SVD.
+- nalgebra文档和功能非常齐全.
+
+** [2018-02-21 Wed] reaxa完成v0.1.2版. 三项功能合一. 可以歇歇了.
 ** [2018-02-19 Mon] rust升级至1.24, 新功能: 增量编译. 调代码效率可以高一些了.
 ** [2018-02-19 Mon] cgmath基本用法
 : np.linalg.norm => vector.magnitude()
 : mat.T => mat.transpose()
 : np.linalg.inv(mat) => mat.invert()
+
+array to Point3
+: Point3::from([0.0; 3]);
 
 ** [2018-02-18 Sun] 使approx crate来测试浮点数值的匹配性
 #+name: c388cfa1-83ec-4833-af78-b3a6698def26
@@ -145,6 +154,23 @@ nom的优点:
 - 解析单元可自由组合 (parser combinator library)
 - 容易调试, 容易集成. 方便实现更复杂的解析逻辑
 - 比regex更快.
+
+ws! 吃掉空格字符, 包括换行符.
+
+解析函数:
+: let x = float_s("1.423E-3");
+
+对于简单的xyz list字串, debug build下总体上比常规手写要慢约4倍, 但release优化后,
+性能甚至超过常规. 挺堪一用的.
+
+使用split_whitespace和parse函数:
+// debug 5.9 µs, release: 569.3 ns
+
+使用nom double_s
+// debug: 32.1 µs, release: 630.4 ns
+
+不对double字符检测, 直接parse_to
+// debug: 22.3 µs, release: 475.6 ns
 
 ** [2018-01-19 Fri] 文件读写
 - [[https://doc.rust-lang.org/std/fs/struct.File.html][std::fs::File - Rust]]
@@ -538,123 +564,10 @@ fn sqrt(x: f64) -> f64 {
   clap = "*"
   zip = "*"
   nom = "*"
+  timeit = "*"
   petgraph = "*"
-
 #+END_SRC
 
-* tests [0/0]
-** scratch
-#+name: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
-#+begin_src shell :results output
-  cargo run
-#+end_src
-
-** hamming distance
-*** test
-#+name: 18144448-0970-4f66-bbd3-f206635ba2cf
-#+begin_src shell :results output
-  cd exercism/rust/hamming
-  cargo test -- --nocapture
-#+end_src
-
-#+RESULTS: 18144448-0970-4f66-bbd3-f206635ba2cf
-#+begin_example
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-
-
-running 7 tests
-test test_first_string_is_longer ... ok
-test test_complete_hamming_distance_in_small_strand ... ok
-test test_larger_distance ... ok
-test test_no_difference_between_empty_strands ... ok
-test test_no_difference_between_identical_strands ... ok
-test test_second_string_is_longer ... ok
-test test_small_hamming_distance_in_the_middle_somewhere ... ok
-
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-
-#+end_example
-
-*** src
-:PROPERTIES:
-:header-args: :tangle exercism/rust/hamming/src/lib.rs
-:END:
-
-#+name: 86e0273f-d292-4c9a-a644-a82b07625639
-#+begin_src rust
-  pub fn hamming_distance(s1: &str, s2: &str) -> Result <usize, String> {
-      if s1.len() != s2.len() {
-          return Err("err".to_string())
-      } else {
-          let l = get_hamming_distance(s1, s2);
-          Ok(l)
-      }
-  }
-
-  fn get_hamming_distance(s1: &str, s2: &str) -> usize {
-      assert_eq!(s1.len(), s2.len());
-
-      let mut sum = 0;
-      for (c1, c2) in s1.chars().zip(s2.chars()) {
-          if c1 != c2 {
-              sum += 1;
-          }
-      }
-      sum
-  }
-#+end_src
-
-** reverse string
-*** test
-#+name: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
-#+begin_src shell :results output
-  cd exercism/rust/reverse*
-  cargo test
-#+end_src
-
-#+RESULTS: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
-#+begin_example
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-
-
-running 5 tests
-test test_a_capitalized_word ... ignored
-test test_a_palindrome ... ignored
-test test_a_sentence_with_punctuation ... ignored
-test test_a_word ... ignored
-test test_empty_string ... ok
-
-test result: ok. 1 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-
-#+end_example
-
-*** src
-:PROPERTIES:
-:header-args: :tangle exercism/rust/reverse-string/src/lib.rs
-:END:
-
-#+name: 3d017385-a2ca-49af-8494-9b2dd4569f24
-#+begin_src rust
-  pub fn reverse(s: &str) -> String {
-      s.chars().rev().collect::<String>()
-  }
-#+end_src
 * reaxa
 ** cargo
 #+name: d5f68605-90cb-4b2b-b316-2025d935c17b
@@ -3185,6 +3098,208 @@ References
   }
 #+end_src
 
+* tests
+** nom
+:PROPERTIES:
+:header-args: :tangle tests/test_nom.rs
+:END:
+#+name: a2a216f8-6387-4449-aed7-5de45e1c01b1
+#+begin_src rust
+  #[macro_use]
+  extern crate nom;
+
+  #[macro_use]
+  extern crate timeit;
+
+  use std::fmt::Debug;
+  use nom::IResult;
+  use nom::{alphanumeric, multispace, float_s, double_s, digit, anychar};
+
+  // named!(get_name_and_position<&str, (&str, [f32; 3])>,
+  //        do_parse!(
+  //            name: alphanumeric >>
+  //            multispace   >>
+  //            x: float_s   >>
+  //            multispace   >>
+  //            y: float_s   >>
+  //            multispace   >>
+  //            z: float_s   >>
+  //            ((name, [x, y, z]))
+  //        )
+  // );
+
+  // debug 5.9 µs, release: 569.3 ns
+  fn test0(line: &str) -> Vec<f64> {
+      let r: Vec<_> = line.split_whitespace().map(|x| x.parse().unwrap()).collect();
+      r
+  }
+
+  // debug: 32.1 µs, release: 630.4 ns
+  named!(test1<&str, Vec<f64>>,
+         many_m_n!(3, 3, ws!(double_s))
+  );
+
+  // quick and dirty
+  named!(not_whitespace<&str, &str>,
+         is_not_s!(" \t" )
+  );
+
+  named!(maybe_double<&str, f64>,
+         flat_map!(recognize!(not_whitespace), parse_to!(f64))
+  );
+
+  // debug: 22.3 µs, release: 475.6 ns
+  named!(test2<&str, Vec<f64>>,
+         many_m_n!(3, 3, ws!(maybe_double))
+  );
+
+  //
+  fn dump<T: Debug>(res: IResult<&str,T>) {
+      match res {
+          IResult::Done(rest, value) => {
+              println!("Done => value: {:?} rest: {:?}", value, rest)
+          },
+          IResult::Error(err) => {println!("Err => {:?}", err)},
+          IResult::Incomplete(needed) => {println!("Needed => {:?}", needed)}
+      }
+  }
+
+  #[test]
+  fn test_named() {
+      let line = "3                 1.49136679   -7.04246937   -3.37298245\r\n";
+      // let line = "H31.49136679-7.04246937-3.37298245\r\n";
+      // let x = get_name_and_position(line);
+
+      // let x = test("# Timestep 100\n");
+      let x = test2(" 1.2 2.1 3.3 ");
+      dump(x);
+
+      timeit!({
+          let x = test0("1.2 2.1 3.3");
+      });
+
+      timeit!({
+          let x = test1("1.2 2.1 3.3");
+      });
+
+      timeit!({
+          let x = test2("1.2 2.1 3.3");
+      });
+  }
+#+end_src
+
+** scratch
+#+name: 26fc6fdf-a306-4357-aa27-ceeb00164a2d
+#+begin_src shell :results output
+  cargo run
+#+end_src
+
+** hamming distance
+*** test
+#+name: 18144448-0970-4f66-bbd3-f206635ba2cf
+#+begin_src shell :results output
+  cd exercism/rust/hamming
+  cargo test -- --nocapture
+#+end_src
+
+#+RESULTS: 18144448-0970-4f66-bbd3-f206635ba2cf
+#+begin_example
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 7 tests
+test test_first_string_is_longer ... ok
+test test_complete_hamming_distance_in_small_strand ... ok
+test test_larger_distance ... ok
+test test_no_difference_between_empty_strands ... ok
+test test_no_difference_between_identical_strands ... ok
+test test_second_string_is_longer ... ok
+test test_small_hamming_distance_in_the_middle_somewhere ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+#+end_example
+
+*** src
+:PROPERTIES:
+:header-args: :tangle exercism/rust/hamming/src/lib.rs
+:END:
+
+#+name: 86e0273f-d292-4c9a-a644-a82b07625639
+#+begin_src rust
+  pub fn hamming_distance(s1: &str, s2: &str) -> Result <usize, String> {
+      if s1.len() != s2.len() {
+          return Err("err".to_string())
+      } else {
+          let l = get_hamming_distance(s1, s2);
+          Ok(l)
+      }
+  }
+
+  fn get_hamming_distance(s1: &str, s2: &str) -> usize {
+      assert_eq!(s1.len(), s2.len());
+
+      let mut sum = 0;
+      for (c1, c2) in s1.chars().zip(s2.chars()) {
+          if c1 != c2 {
+              sum += 1;
+          }
+      }
+      sum
+  }
+#+end_src
+
+** reverse string
+*** test
+#+name: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
+#+begin_src shell :results output
+  cd exercism/rust/reverse*
+  cargo test
+#+end_src
+
+#+RESULTS: 404ac282-7c49-4a99-8cbf-e5cf4a2952f6
+#+begin_example
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 5 tests
+test test_a_capitalized_word ... ignored
+test test_a_palindrome ... ignored
+test test_a_sentence_with_punctuation ... ignored
+test test_a_word ... ignored
+test test_empty_string ... ok
+
+test result: ok. 1 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+#+end_example
+
+*** src
+:PROPERTIES:
+:header-args: :tangle exercism/rust/reverse-string/src/lib.rs
+:END:
+
+#+name: 3d017385-a2ca-49af-8494-9b2dd4569f24
+#+begin_src rust
+  pub fn reverse(s: &str) -> String {
+      s.chars().rev().collect::<String>()
+  }
+#+end_src
 * References
 - [[https://rust-lang-nursery.github.io/rust-cookbook/basics.html][Rust Cookbook]]
 - [[http://stevedonovan.github.io/rust-gentle-intro/readme.html][Introduction - A Gentle Introduction to Rust]]
