@@ -150,6 +150,8 @@ add_edge时需注意:默认petgraph充许parallel edges, 因此多次添加edge�
 - [[https://stevedonovan.github.io/rust-gentle-intro/nom-intro.html#parsing-text-with-nom][Parsing with Nom - A Gentle Introduction to Rust]]
 - [[http://rust.unhandledexpression.com/nom/][nom - Rust]]
 
+注意tag_s等宏被弃用, 可以直接用tag等代替.
+
 nom的优点:
 - 解析单元可自由组合 (parser combinator library)
 - 容易调试, 容易集成. 方便实现更复杂的解析逻辑
@@ -164,13 +166,24 @@ ws! 吃掉空格字符, 包括换行符.
 性能甚至超过常规. 挺堪一用的.
 
 使用split_whitespace和parse函数:
+: line.split_whitespace().map(|x| x.parse().unwrap()).collect()
 // debug 5.9 µs, release: 569.3 ns
 
 使用nom double_s
+: many_m_n!(3, 3, ws!(double_s))
 // debug: 32.1 µs, release: 630.4 ns
 
 不对double字符检测, 直接parse_to
-// debug: 22.3 µs, release: 475.6 ns
+: flat_map!(recognize!(is_not_s!(" \t")), parse_to!(f64))
+: ...
+// debug: 22.3 µs, release: 462.6 ns
+
+不对double字符检测, 直接map_res, parse
+: map_res!(is_not_s!(" \t"), str::parse)
+: ...
+// debug: 21.1 µs, release: 457.2 ns
+
+如果使用tuple!宏来替换many_m_n!可以进一步提升性能(457 --> 384).
 
 ** [2018-01-19 Fri] 文件读写
 - [[https://doc.rust-lang.org/std/fs/struct.File.html][std::fs::File - Rust]]
@@ -3140,17 +3153,33 @@ References
   );
 
   // quick and dirty
-  named!(not_whitespace<&str, &str>,
-         is_not_s!(" \t" )
-  );
-
   named!(maybe_double<&str, f64>,
-         flat_map!(recognize!(not_whitespace), parse_to!(f64))
+         // flat_map!(recognize!(is_not_s!(" \t")), parse_to!(f64))
+         map_res!(is_not_s!(" \t"), str::parse)
   );
 
   // debug: 22.3 µs, release: 475.6 ns
   named!(test2<&str, Vec<f64>>,
          many_m_n!(3, 3, ws!(maybe_double))
+  );
+
+  // debug: 20.1 µs, release: 388.7 ns
+  named!(test3<&str, (f64, f64, f64)>,
+         tuple!(
+             ws!(maybe_double),
+             ws!(maybe_double),
+             ws!(maybe_double)
+         )
+  );
+
+  // debug: 20.1 µs, release: 385.4 ns
+  named!(test4<&str, [f64; 3]>,
+         do_parse!(
+             x: ws!(maybe_double) >>
+             y: ws!(maybe_double) >>
+             z: ws!(maybe_double) >>
+             ([x, y, z])
+         )
   );
 
   //
@@ -3171,7 +3200,7 @@ References
       // let x = get_name_and_position(line);
 
       // let x = test("# Timestep 100\n");
-      let x = test2(" 1.2 2.1 3.3 ");
+      let x = test4(" 1.2 2.1 3.3 x");
       dump(x);
 
       timeit!({
@@ -3184,6 +3213,14 @@ References
 
       timeit!({
           let x = test2("1.2 2.1 3.3");
+      });
+
+      timeit!({
+          let x = test3("1.2 2.1 3.3");
+      });
+
+      timeit!({
+          let x = test4("1.2 2.1 3.3");
       });
   }
 #+end_src
