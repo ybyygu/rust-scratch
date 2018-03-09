@@ -3,7 +3,76 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/10]
+* Memo [2/11]
+** [2018-03-09 Fri] 可以使用include_str和include_bytes宏来导入外部文件
+- [[https://doc.rust-lang.org/std/macro.include_str.html][std::include_str - Rust]]
+
+** [2018-03-09 Fri] 使用cargo watch来自动化调试流程 [[https://github.com/passcod/cargo-watch][passcod/cargo-watch]] :Starred:
+install
+: cargo install cargo-watch
+update
+: cargo install --force cargo-watch
+
+自动check && test
+: cargo watch -x check -x test
+
+这样org tangle代码后, 可以实时看到代码结果输出. 比ipython里的module reload还强.
+
+** [2018-03-09 Fri] 查看rust离线文档                               :Starred:
+standard library API
+#+begin_src shell  :results silent
+  rustup doc --std
+#+end_src
+
+TRPL book:
+#+begin_src shell :results silent
+  rustup doc --book
+#+end_src
+
+** TODO [2018-03-08 Thu] rust notes
+I would tell someone: don't expect to learn it fast. I've heard it said that you
+can learn Go in a week. You can't learn Rust in a week, not in depth anyway. And
+learning it requires grit, especially in the beginning. Also: its super helpful
+to actually read rust code, not just struggle to write it. rustbyexample.com is
+good, but its really useful to just read code that is written by the Rust
+Masters: https://github.com/rust-lang-nursery/futures-rs is a good example.
+
+** [2018-03-08 Thu] 使用examples [[http://xion.io/post/code/rust-examples.html][Karol Kuczmarski's Blog – Add examples to your Rust libraries]]
+太有用了.
+
+** [2018-03-08 Thu] 这个也不错 [[https://github.com/carols10cents/rustlings][carols10cents/rustlings: Small exercises to get you used to reading and writing Rust code]]
+** [2018-03-07 Wed] 修改cargo编译目录
+将其放到~/.cache目录下. 以减轻外围同步脚本的负担.
+
+#+begin_src shell
+  _cargo()
+  {
+      if [ -f ./Cargo.toml ]; then
+          rootdir=$(basename $(pwd))
+          CARGO_TARGET_DIR=~/.cache/cargo/$rootdir cargo "$@"
+      else
+          cargo "$@"
+      fi
+  }
+  alias cargo=_cargo
+#+end_src
+以上脚本放在~/.zsh_alias中.
+
+** [2018-03-02 Fri] 使用musl库, 实现纯静态编译
+- 使用rustup安装nightly版本
+- rustup set target
+  : rustup install nightly
+  : rustup default nightly
+  : rustup target add x86_64-unknown-linux-musl
+  : rustup set default-host x86_64-unknown-linux-musl
+- 使用rustup自带cargo编译
+  : cargo build --release
+
+编译后比普通版大两倍(1.5 vs 5.4). 不过可以接受.
+
+References
+- [[https://blog.rust-lang.org/2016/05/13/rustup.html][Taking Rust everywhere with rustup - The Rust Programming Language Blog]]
+
 ** [2018-02-22 Thu] cgmath vs nalgebra
 - 不同线性代数相关库的比较 [[https://www.reddit.com/r/rust/comments/63wts9/why_are_there_so_many_linear_algebra_crates_which/][URL]]
 - cgmath更基础一些, 比如没有SVD.
