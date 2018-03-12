@@ -4,6 +4,24 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [2/11]
+** [2018-03-09 Fri] 如何组织代码: 这里解释的很清楚 [[https://learning-rust.github.io/docs/d1.code_organization.html][Modules | Learning Rust]]
+- Functions
+- Modules Can be mapped to a,
+  - Inline module
+  - File
+  - Directory hierarchy
+
+- Crates Can be mapped to a,
+  - lib.rs file on the same executable crate
+    - Dependency crate specified on Cargo.toml
+      - Can be specified from,
+        - path
+        - git repository
+        - crates.io
+
+- Workspaces
+  - Helps to manage multiple crates as a single project.
+
 ** [2018-03-09 Fri] 可以使用include_str和include_bytes宏来导入外部文件
 - [[https://doc.rust-lang.org/std/macro.include_str.html][std::include_str - Rust]]
 
@@ -632,6 +650,21 @@ fn sqrt(x: f64) -> f64 {
 : cargo test
 测试时允许print语句输出:
 : cargo test -- --nocapture
+* Libraries
+各种细分领域crates总结:
+- [[http://arewegameyet.com/][Are we game yet? - Rust]]
+- [[http://www.arewelearningyet.com/][Are we learning yet?]]
+- [[http://www.arewewebyet.org/][Are we web yet? » AWWY?]]
+- [[https://areweideyet.com/][Are we (I)DE yet?]]
+
+常用库:
+- [[https://github.com/hniksic/rust-subprocess][hniksic/rust-subprocess: Execution of and interaction with external processes and pipelines]]
+- [[https://github.com/philippkeller/rexpect][philippkeller/rexpect: Rust port of pexpect]]
+- [[https://github.com/FGRibreau/spinners][FGRibreau/spinners: 60+ Elegant terminal spinners for Rust]]
+- [[https://github.com/noshu/lbfgsb-sys][noshu/lbfgsb-sys: Rust binding of fortran Limited memory LBFGS subroutine]]
+
+* TODO FFI
+- [[https://github.com/alexcrichton/rust-ffi-examples][alexcrichton/rust-ffi-examples: FFI examples written in Rust]]
 
 * cargo
 #+name: 7935cdce-84b1-4d22-a63d-7d0a8580a279
