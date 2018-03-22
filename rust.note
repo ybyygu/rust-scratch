@@ -3,7 +3,30 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/11]
+* Memo [2/12]
+** [2018-03-22 Thu] 使用just来做程序分布等后续工作 [[https://github.com/casey/just][casey/just]]
+- 可以方便地静态编译,
+- 添加各种编译优化选项
+- 使用upx等减少程序体积.
+
+** [2018-03-22 Thu] 防GFW [[https://lug.ustc.edu.cn/wiki/mirrors/help/rust-crates][Rust Crates 镜像使用帮助 {LUG@USTC}]]
+** [2018-03-15 Thu] emacs中racer自动补全的问题
+提示出错:
+: No such directory: /home/ybyygu/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src.
+: Please set ‘racer-rust-src-path’ or ‘RUST_SRC_PATH’)
+
+解决方法:
+: rustup component add rust-src
+
+** TODO [2018-03-15 Thu] 使用[[https://github.com/TeXitoi/structopt][structopt]]+clap来写命令行程序
+这里有些其它好东西: [[https://internals.rust-lang.org/t/announcing-the-cli-working-group/6872/16][Announcing the CLI Working Group - announcements - Rust Internals]]
+
+- [[https://github.com/mitsuhiko/indicatif][mitsuhiko/indicatif: A command line progress reporting library for Rust]]
+
+** [2018-03-14 Wed] rust写成的grep/ag工具, 更快 [[https://github.com/BurntSushi/ripgrep][BurntSushi/ripgrep: ripgrep recursively searches directories for a regex pattern]]
+
+** [2018-03-14 Wed] rust写成的term, 特点是快 [[https://github.com/jwilm/alacritty][jwilm/alacritty: A cross-platform, GPU-accelerated terminal emulator]]
+
 ** [2018-03-13 Tue] clap的两个特别的宏, 可以使用crate中的版本信息  :Starred:
 : crate_authors!()
 : crate_version!()
@@ -26,7 +49,7 @@
 - Workspaces
   - Helps to manage multiple crates as a single project.
 
-** [2018-03-09 Fri] 可以使用include_str和include_bytes宏来导入外部文件
+** [2018-03-09 Fri] 可以使用include_str和include_bytes宏来导入外部文件 :Starred:
 - [[https://doc.rust-lang.org/std/macro.include_str.html][std::include_str - Rust]]
 
 ** [2018-03-09 Fri] 使用cargo watch来自动化调试流程 [[https://github.com/passcod/cargo-watch][passcod/cargo-watch]] :Starred:
