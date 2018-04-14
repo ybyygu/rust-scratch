@@ -3,7 +3,59 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/12]
+* Memo [2/13]
+** TODO [2018-04-14 Sat] 也许可以用这个来调R中的包: [[https://github.com/rustr/rustr][rustr/rustr: Rust and R Integration]]
+** [2018-04-10 Tue] 使用error-chain crate [[http://brson.github.io/2016/11/30/starting-with-error-chain][URL]]                      :Starred:
+定义大致模板:
+#+begin_src rust
+  // `error_chain!` can recurse deeply
+  #![recursion_limit = "1024"]
+
+  // Import the macro. Don't forget to add `error-chain` in your
+  // `Cargo.toml`!
+  #[macro_use]
+  extern crate error_chain;
+
+  // We'll put our errors in an `errors` module, and other modules in
+  // this crate will `use errors::*;` to get access to everything
+  // `error_chain!` creates.
+  mod errors {
+      // Create the Error, ErrorKind, ResultExt, and Result types
+      error_chain!{}
+  }
+
+  // This only gives access within this module. Make this `pub use errors::*;`
+  // instead if the types must be accessible from other modules (e.g., within
+  // a `links` section).
+  use errors::*;
+#+end_src
+
+使用chain_err来标记出错原因:
+#+begin_src rust
+  // Most functions will return the `Result` type, imported from the
+  // `errors` module. It is a typedef of the standard `Result` type
+  // for which the error type is always our own `Error`.
+  fn run() -> Result<()> {
+      use std::fs::File;
+
+      // This operation will fail
+      File::open("tretrete")
+          .chain_err(|| "unable to open tretrete file")?;
+
+      Ok(())
+  }
+#+end_src
+
+使用bail!宏来自定义错误信息.
+#+begin_src rust
+  bail!("I don't like this: {}", nonsense);
+#+end_src
+
+可以用assure!宏来代替assert, 避免直接panic整个程序.
+#+begin_src rust
+  ensure!(condition, "error code: {}", errcode);
+#+end_src
+
 ** [2018-04-10 Tue] 禁用"unused code warnings"
 : #![allow(dead_code)]
 或者使用特殊变量名:
@@ -55,7 +107,10 @@
   - Helps to manage multiple crates as a single project.
 
 ** [2018-03-09 Fri] 可以使用include_str和include_bytes宏来导入外部文件 :Starred:
-- [[https://doc.rust-lang.org/std/macro.include_str.html][std::include_str - Rust]]
+- 从文件读入字串: [[https://doc.rust-lang.org/std/macro.include_str.html][std::include_str - Rust]]
+- 从文件读入rust语句: [[https://doc.rust-lang.org/std/macro.include.html][std::include - Rust]]
+
+导入的文件内容直接编译进入了binary.
 
 ** [2018-03-09 Fri] 使用cargo watch来自动化调试流程 [[https://github.com/passcod/cargo-watch][passcod/cargo-watch]] :Starred:
 install
@@ -131,7 +186,6 @@ References
 - cgmath更基础一些, 比如没有SVD.
 - nalgebra文档和功能非常齐全.
 
-** [2018-02-21 Wed] reaxa完成v0.1.2版. 三项功能合一. 可以歇歇了.
 ** [2018-02-19 Mon] rust升级至1.24, 新功能: 增量编译. 调代码效率可以高一些了.
 ** [2018-02-19 Mon] cgmath基本用法
 : np.linalg.norm => vector.magnitude()
@@ -1323,6 +1377,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 - [[https://learnxinyminutes.com/docs/rust/][Learn rust in Y Minutes]]
 
 * Local variables
+# Emacs:
 # Local Variables:
 # mode: org
 # end:
