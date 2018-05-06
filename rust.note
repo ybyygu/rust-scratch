@@ -3,10 +3,38 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/13]
+* Memo [2/15]
+** [2018-05-06 Sun] trait object: 实现类似python中动态语言的特性
+- [[https://doc.rust-lang.org/book/first-edition/trait-objects.html][Trait Objects - The Rust Programming Language]]
+- [[https://doc.rust-lang.org/book/second-edition/ch17-02-trait-objects.html][Trait Objects for Using Values of Different Types - The Rust Programming Language]]
+- [[https://brson.github.io/rust-anthology/1/all-about-trait-objects.html][All About Trait Objects]]
+
+- trait是virtual的. trait object是指针化的trait, 可以实现一些需要运行时确定的动态特性.
+- 不是所有的trait都可以转化为trait object, 需要满足object safe.
+  - 如果我们不希望一个 trait 通过trait object的方式使用，可以为它加上Self: Sized约束。
+  - 果我们想阻止一个函数在虚函数表中出现，可以专门为该函数加上Self: Sized约束
+
+** [2018-04-30 Mon] 自定义公有macro
+在mod文件头部:
+: #![macro_use]
+如果希望macro被外部crate使用, 需要:
+: #[macro_export]
+
+** [2018-04-26 Thu] fd: rust版find 还有一定的并行计算能力. 可以代替parallel
+[[https://github.com/sharkdp/fd][sharkdp/fd: A simple, fast and user-friendly alternative to 'find']]
+
+** TODO [2018-04-23 Mon] println输出格式
+- [[https://doc.rust-lang.org/book/second-edition/ch05-02-example-structs.html][An Example Program Using Structs - The Rust Programming Language]]
+
+When we have larger structs, it’s useful to have output that’s a bit easier to
+read; in those cases, we can use {:#?} instead of {:?} in the println! string.
+When we use the {:#?} style in the example, the output will look like this:
+
+** TODO [2018-04-23 Mon] 可以从这里找rust库 libhunt [[https://rust.libhunt.com/][Awesome Rust]]
 ** TODO [2018-04-14 Sat] 也许可以用这个来调R中的包: [[https://github.com/rustr/rustr][rustr/rustr: Rust and R Integration]]
 ** [2018-04-10 Tue] 使用error-chain crate [[http://brson.github.io/2016/11/30/starting-with-error-chain][URL]]                      :Starred:
 定义大致模板:
+#+name: f6b7943a-e73f-4e73-b38d-2d433e999b78
 #+begin_src rust
   // `error_chain!` can recurse deeply
   #![recursion_limit = "1024"]
@@ -31,6 +59,7 @@
 #+end_src
 
 使用chain_err来标记出错原因:
+#+name: fce018e2-0071-4db6-9a0e-2dace68079c9
 #+begin_src rust
   // Most functions will return the `Result` type, imported from the
   // `errors` module. It is a typedef of the standard `Result` type
@@ -47,11 +76,13 @@
 #+end_src
 
 使用bail!宏来自定义错误信息.
+#+name: 513cd5fc-1b24-4ef4-a149-79e50eced9af
 #+begin_src rust
   bail!("I don't like this: {}", nonsense);
 #+end_src
 
 可以用assure!宏来代替assert, 避免直接panic整个程序.
+#+name: d7ee5c60-ba2a-4c48-8033-6175f1683967
 #+begin_src rust
   ensure!(condition, "error code: {}", errcode);
 #+end_src
@@ -1145,6 +1176,57 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 * tests
+** trait object
+:PROPERTIES:
+:header-args: :tangle tests/test_traitobj.rs
+:END:
+#+name: e717db8c-223b-4342-b637-654513af758b
+#+begin_src rust
+  trait ChemFile {
+      fn parse(&self);
+  }
+
+  #[derive(Debug)]
+  struct Mol2File();
+
+  impl ChemFile for Mol2File {
+      fn parse(&self) { println!("foo1 {:?}", self); }
+  }
+
+  #[derive(Debug)]
+  struct XYZFile();
+
+  impl ChemFile for XYZFile {
+      fn parse(&self) { println!("XYZ {:?}", self); }
+  }
+
+  fn guess_chemfile() -> Option<Box<ChemFile>> {
+      let mut all: Vec<Box<ChemFile>> = vec![
+          Box::new(Mol2File()),
+          Box::new(XYZFile()),
+      ];
+
+      for p in all {
+          p.parse();
+          return Some(p)
+      }
+
+      None
+  }
+
+  #[test]
+  fn test_trait() {
+      let mut all: Vec<Box<ChemFile>> = vec![
+          Box::new(Mol2File()),
+          Box::new(XYZFile()),
+      ];
+
+      for p in all {
+          p.parse();
+      }
+  }
+#+end_src
+
 ** nom
 :PROPERTIES:
 :header-args: :tangle tests/test_nom.rs
