@@ -4,6 +4,76 @@
 #+SETUPFILE: ~/Notes/coding.org
 
 * Memo [2/15]
+** [2018-05-11 Fri] 使用docker manylinux交叉编译环境
+*** dockerfile
+自制docker. 由于GFW, 变麻烦了很多. 需要下载rustup-init.she脚本, 修改其中的变量为
+ustc.
+#+name: ba3c4b7d-29aa-4849-9130-cd43db7d1806
+#+BEGIN_SRC text :tangle ~/Incoming/docker/Dockerfile :comments no
+  FROM quay.io/pypa/manylinux1_x86_64:latest
+  MAINTAINER Wenping Guo <ybyygu@gmail.com>
+
+  #VOLUME ${PWD}:/opt/volume
+
+  COPY ./cargo-config /root/.cargo/config
+
+  COPY ./rustup-init.sh /root/
+
+  WORKDIR /root
+
+  # install toolchain
+  RUN env RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
+      ./rustup-init.sh --default-toolchain nightly -y \
+
+  ENV PATH=/root/.cargo/bin:$PATH
+  ENV LD_LIBRARY_PATH=/rustroot/lib64:/rustroot/lib
+#+END_SRC
+
+参考:
+- [[https://github.com/PyO3/setuptools-rust/blob/master/example/build-wheels.sh][setuptools-rust/build-wheels.sh at master · PyO3/setuptools-rust]]
+- [[https://github.com/rust-lang/rust/blob/master/src/ci/docker/dist-x86_64-linux/Dockerfile][rust/Dockerfile at master · rust-lang/rust]]
+
+*** enter
+#+name: 4954e9ba-ee5f-40ef-9a44-9b2c330816e2
+#+begin_src shell  :tangle ~/Incoming/docker/enter-manylinux.sh :shebang #!/usr/bin/env bash
+  docker run \
+         --rm \
+         --interactive \
+         --tty \
+         --volume ${PWD}:/opt/volume \
+         --workdir /opt/volume \
+         quay.io/pypa/manylinux1_x86_64 \
+         bash
+#+end_src
+
+*** compile wheel
+#+BEGIN_SRC shell
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/rust/lib"
+  export PYBIN=/opt/python/cp36-cp36m/bin
+  export PATH=$PYBIN:$PATH
+  export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
+  export PYTHON_LIB=$(${PYBIN}/python -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
+  export LIBRARY_PATH="$LIBRARY_PATH:$PYTHON_LIB"
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$PYTHON_LIB"
+  "${PYBIN}/pip" install -U setuptools setuptools-rust wheel
+  "${PYBIN}/pip" wheel ./ -w dist/
+  auditwheel repair dist/*wheel -w dist/
+#+END_SRC
+
+试了pyo3的几个例子, 行不通. 暂时到此为止.
+
+** [2018-05-10 Thu] HMM [[https://github.com/messense/jieba-rs/blob/master/src/hmm.rs][jieba-rs/hmm.rs at master · messense/jieba-rs]]
+** [2018-05-10 Thu] 使用cargo版本变量, 太方便了.
+: let version = env!("CARGO_PKG_VERSION");
+
+** [2018-05-10 Thu] 可以用gtk-rs写一些GUI程序 [[https://gtk-rs.org/tuto/glade][Glade]]
+
+** [2018-05-06 Sun] 施工中: unimplemented
+可以用内置的宏:
+: unimplemented!()
+或者用error-chain中提供的宏:
+: bail!("msg");
+
 ** [2018-05-06 Sun] trait object: 实现类似python中动态语言的特性
 - [[https://doc.rust-lang.org/book/first-edition/trait-objects.html][Trait Objects - The Rust Programming Language]]
 - [[https://doc.rust-lang.org/book/second-edition/ch17-02-trait-objects.html][Trait Objects for Using Values of Different Types - The Rust Programming Language]]
