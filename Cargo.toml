@@ -11,4 +11,6 @@ zip = "*"
 nom = "*"
 timeit = "*"
 petgraph = "*"
+approx = "*"
+nalgebra = "*"
 # 7935cdce-84b1-4d22-a63d-7d0a8580a279 ends here

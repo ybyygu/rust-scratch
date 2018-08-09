@@ -3,8 +3,70 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/15]
-** [2018-05-11 Fri] 使用docker manylinux交叉编译环境
+* Memo [2/22]
+** [2018-07-27 Fri] nalgebra使用笔记
+matrix内部不管shape如何, 都是以linear的形式保存的.
+
+比如Matrix3方阵:
+: let a = Matrix3...
+线性取值
+: a[0], a[1], ..., a[8]
+
+以行列号取值:
+: a[(0, 0)], ..., a[(2, 2)]
+
+
+** [2018-07-11 Wed] 代数运算 (GPU)新选择 [[https://github.com/arrayfire/arrayfire-rust][arrayfire/arrayfire-rust: Rust wrapper for ArrayFire]]
+** [2018-06-25 Mon] string类函数参数泛化处理                       :Starred:
+接受&str或String类型为String:
+#+name: f99d74d4-39b9-42f6-a84a-c8ffb4811600
+#+begin_src rust
+  fn test<S: Into<String>(s: S) {
+      //
+  }
+#+end_src
+
+接受&str或String类型为&str:
+#+name: 713d9c37-003c-4409-b700-d01b5ac5b1c7
+#+begin_src rust
+  fn test<S: AsRef<str>>(s: S) {
+      //
+  }
+#+end_src
+
+- https://doc.rust-lang.org/std/convert/trait.AsRef.html
+
+** TODO [2018-06-24 Sun] rust 版本号管理规范 [[https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md][rfcs/1105-api-evolution.md at master · rust-lang/rfcs
+]]
+** [2018-06-20 Wed] quicli中verbosity的问题
+verbosity设置仅当为一个单独的binary crate时才有效, 如果是test或example模块无法使
+用"-vv"命令选项设置log的level.
+
+** TODO [2018-06-07 Thu] 帮宝儿一个mandelbrot set 游戏
+- [[https://github.com/willi-kappler/mandel-rust][willi-kappler/mandel-rust: Mandelbrot set in rust, serial and parallel example]]
+- [[https://github.com/pistondevelopers/image][PistonDevelopers/image: Encoding and decoding images in Rust]]
+
+** TODO [2018-06-01 Fri] 并行计算库: [[https://github.com/actix/actix][actix/actix: Actor framework for Rust]]
+** TODO [2018-05-31 Thu] 使用string来添加行
+使用write宏
+#+name: 51e9f2d6-180e-4fa7-86b1-68f2ae441a92
+#+begin_src rust
+  use std::fmt::Write;
+
+  pub fn main() {
+      let mut a = "hello ".to_string();
+      write!(&mut a, "{}", 5).unwrap();
+
+      println!("{}", a);
+      assert_eq!("hello 5", a);
+  }
+#+end_src
+
+使用string.push_str
+
+** TODO [2018-05-20 Sun] 使用rsmpi来写mpi程序 [[https://github.com/bsteinb/rsmpi][MPI bindings for Rust]]
+** TODO [2018-05-18 Fri] 可将python编译为python的项目 [[https://github.com/joncatanio/cannoli][joncatanio/cannoli: Cannoli Programming Language]]
+** TODO [2018-05-11 Fri] 使用docker manylinux交叉编译环境
 *** dockerfile
 自制docker. 由于GFW, 变麻烦了很多. 需要下载rustup-init.she脚本, 修改其中的变量为
 ustc.
@@ -47,6 +109,7 @@ ustc.
 #+end_src
 
 *** compile wheel
+#+name: 9682c20a-4e34-4105-9180-0a7c42b09ecf
 #+BEGIN_SRC shell
   export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/rust/lib"
   export PYBIN=/opt/python/cp36-cp36m/bin
@@ -168,6 +231,12 @@ When we use the {:#?} style in the example, the output will look like this:
 - 使用upx等减少程序体积.
 
 ** [2018-03-22 Thu] 防GFW [[https://lug.ustc.edu.cn/wiki/mirrors/help/rust-crates][Rust Crates 镜像使用帮助 {LUG@USTC}]]
+#+name: fc33f678-42bd-4255-897e-278d935f737a
+#+begin_src shell :tangle ~/Install/configs/rust/ustc.rc
+  export RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static
+  export RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+#+end_src
+
 ** [2018-03-15 Thu] emacs中racer自动补全的问题
 提示出错:
 : No such directory: /home/ybyygu/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src.
@@ -281,11 +350,6 @@ Masters: https://github.com/rust-lang-nursery/futures-rs is a good example.
 
 References
 - [[https://blog.rust-lang.org/2016/05/13/rustup.html][Taking Rust everywhere with rustup - The Rust Programming Language Blog]]
-
-** [2018-02-22 Thu] cgmath vs nalgebra
-- 不同线性代数相关库的比较 [[https://www.reddit.com/r/rust/comments/63wts9/why_are_there_so_many_linear_algebra_crates_which/][URL]]
-- cgmath更基础一些, 比如没有SVD.
-- nalgebra文档和功能非常齐全.
 
 ** [2018-02-19 Mon] rust升级至1.24, 新功能: 增量编译. 调代码效率可以高一些了.
 ** [2018-02-19 Mon] cgmath基本用法
@@ -840,6 +904,7 @@ fn sqrt(x: f64) -> f64 {
 : cargo test
 测试时允许print语句输出:
 : cargo test -- --nocapture
+
 * Libraries
 各种细分领域crates总结:
 - [[http://arewegameyet.com/][Are we game yet? - Rust]]
@@ -871,6 +936,8 @@ fn sqrt(x: f64) -> f64 {
   nom = "*"
   timeit = "*"
   petgraph = "*"
+  approx = "*"
+  nalgebra = "*"
 #+END_SRC
 
 * src
@@ -1246,6 +1313,172 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 * tests
+** nalgebra
+:PROPERTIES:
+:header-args: :tangle tests/test_nalgebra.rs
+:END:
+#+name: 78136a22-35fb-48a1-9e90-f22453748f0f
+#+begin_src rust
+  #[macro_use] extern crate approx;
+
+  extern crate nalgebra;
+  use nalgebra as na;
+
+  /// Vector in 3D space
+  pub type Vector3f = na::Vector3<f64>;
+
+  /// 3xN matrix storing a list of 3D vectors
+  pub type Vector3fVec = na::Matrix<f64, na::U3, na::Dynamic, na::MatrixVec<f64, na::U3, na::Dynamic>>;
+
+  /// Cartesian 3D coordinates
+  pub type Position = Vector3f;
+  /// A list of 3D position vectors
+  pub type Positions = Vector3fVec;
+
+  /// Dynamic array containing float numbers
+  pub type FloatVec = na::DVector<f64>;
+
+  /// A trait provides useful tools for Vec<f64> type.
+  pub trait VecFloatMath {
+      /// Convert to nalgebra dynamic 1xN vector
+      fn to_dvector(&self) -> FloatVec;
+
+      /// 1xN Vector norm
+      fn norm(&self) -> f64;
+  }
+
+  impl VecFloatMath for [f64] {
+      fn to_dvector(&self) -> FloatVec {
+          FloatVec::from_column_slice(self.len(), &self)
+      }
+
+      fn norm(&self) -> f64 {
+          let mut s = 0.0;
+          for &x in self {
+              s += x.powi(2);
+          }
+
+          s.sqrt()
+      }
+  }
+
+  /// A trait provides useful tools for Vec<[f64; 3]> type.
+  pub trait VecFloat3Math {
+      /// Return the Frobenius norm (matrix norm) defined as the square root of
+      /// the sum of the absolute squares of its elements.
+      fn norm(&self) -> f64;
+
+      /// return the norms of a list of 3D vectors
+      fn norms(&self) -> Vec<f64>;
+
+      /// Return a 1-D array, containing the elements of 3xN array
+      fn ravel(&self) -> Vec<f64>;
+
+      /// Convert to 3xN dynamic matrix
+      fn to_dmatrix(&self) -> Vector3fVec;
+  }
+
+  // impl VecFloat3Math for Vec<[f64; 3]> {
+  impl VecFloat3Math for [[f64; 3]] {
+      fn ravel(&self) -> Vec<f64> {
+          let n = self.len();
+          let mut r = Vec::with_capacity(3 * n);
+
+          for i in 0..n {
+              for j in 0..3 {
+                  r.push(self[i][j]);
+              }
+          }
+
+          r
+      }
+
+      fn norm(&self) -> f64 {
+          let mut d2: f64 = 0.0;
+          for i in 0..self.len() {
+              for j in 0..3 {
+                  d2 += self[i][j].powi(2);
+              }
+          }
+          d2.sqrt()
+      }
+
+      fn norms(&self) -> Vec<f64> {
+          let n = self.len();
+          let mut norms = Vec::with_capacity(n);
+
+          for i in 0..n {
+              let mut l = 0.0;
+              for j in 0..3 {
+                  let vij = self[i][j];
+                  l += vij.powi(2);
+              }
+
+              norms.push(l.sqrt());
+          }
+
+          norms
+      }
+
+      fn to_dmatrix(&self) -> Vector3fVec {
+          // FIXME: performance
+          let r = self.ravel();
+          Vector3fVec::from_column_slice(self.len(), &r)
+      }
+  }
+
+  #[test]
+  fn test_vec_math() {
+      let a = vec![1.0, 2.0, 3.0];
+      let x = a.to_dvector();
+      assert_relative_eq!(x.norm(), a.norm(), epsilon=1e-3);
+
+      let positions = [[-0.131944, -0.282942,  0.315957],
+                       [ 0.40122 , -1.210646,  0.315957],
+                       [-1.201944, -0.282942,  0.315957],
+                       [ 0.543331,  0.892036,  0.315957],
+                       [ 0.010167,  1.819741,  0.315957],
+                       [ 1.613331,  0.892036,  0.315957]];
+
+      let n = positions.norm();
+      let m = positions.to_dmatrix();
+      assert_relative_eq!(n, m.norm(), epsilon=1e-4);
+      let n = positions.to_vec().norm();
+
+      let x = positions.ravel();
+      assert_eq!(positions.len() * 3, x.len());
+  }
+#+end_src
+
+** stats
+:PROPERTIES:
+:header-args: :tangle tests/test_stats.rs
+:END:
+#+name: c24f7470-3be6-4eab-9e2c-e995bff06d4c
+#+begin_src rust
+  #![feature(test)]
+  extern crate test;
+
+  use test::stats::Stats;
+
+  #[test]
+  fn test_stats() {
+      let mut x = vec![1.0, 2.0, 0.1];
+
+      let v= x.sum();
+      println!("{:#?}", v);
+
+      let v= x.max();
+      println!("{:#?}", v);
+
+      let v= x.min();
+      println!("{:#?}", v);
+
+      let v= x.mean();
+      println!("{:#?}", v);
+  }
+#+end_src
+
 ** trait object
 :PROPERTIES:
 :header-args: :tangle tests/test_traitobj.rs
