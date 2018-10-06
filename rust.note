@@ -3,7 +3,19 @@
 #+SETUPFILE: ~/Notes/latex.org
 #+SETUPFILE: ~/Notes/coding.org
 
-* Memo [2/22]
+* Memo [2/23]
+** TODO [2018-09-21 Fri] Rust 2018 edition变化很大 [[https://rust-lang-nursery.github.io/edition-guide/introduction.html][Introduction - The Edition Guide]]
+** [2018-09-19 Wed] rust generator
+- [[https://doc.rust-lang.org/unstable-book/language-features/generators.html][generators]]
+- [[https://doc.rust-lang.org/std/ops/trait.Generator.html][std::ops::Generator - Rust]]
+- [[https://github.com/Geal/generator_nom/blob/master/src/main.rs][generator_nom/main.rs at master · Geal/generator_nom]]
+
+** [2018-08-24 Fri] 使用cross来静态编译 [[https://github.com/rust-embedded/cross][rust-embedded/cross: "Zero setup" cross compilation and "cross testing" of Rust crates]]
+: cargo install cross
+: cross build --target x86_64-pc-windows-gnu
+: cross build --target x86_64-unknown-linux-musl
+
+** [2018-08-09 Thu] 发现了一个新的解析库 [[https://github.com/Marwes/combine][Marwes/combine: A parser combinator library for Rust]]
 ** [2018-07-27 Fri] nalgebra使用笔记
 matrix内部不管shape如何, 都是以linear的形式保存的.
 
@@ -14,7 +26,6 @@ matrix内部不管shape如何, 都是以linear的形式保存的.
 
 以行列号取值:
 : a[(0, 0)], ..., a[(2, 2)]
-
 
 ** [2018-07-11 Wed] 代数运算 (GPU)新选择 [[https://github.com/arrayfire/arrayfire-rust][arrayfire/arrayfire-rust: Rust wrapper for ArrayFire]]
 ** [2018-06-25 Mon] string类函数参数泛化处理                       :Starred:
@@ -36,8 +47,7 @@ matrix内部不管shape如何, 都是以linear的形式保存的.
 
 - https://doc.rust-lang.org/std/convert/trait.AsRef.html
 
-** TODO [2018-06-24 Sun] rust 版本号管理规范 [[https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md][rfcs/1105-api-evolution.md at master · rust-lang/rfcs
-]]
+** TODO [2018-06-24 Sun] rust 版本号管理规范 [[https://github.com/rust-lang/rfcs/blob/master/text/1105-api-evolution.md][rfcs/1105-api-evolution.md at master · rust-lang/rfcs]]
 ** [2018-06-20 Wed] quicli中verbosity的问题
 verbosity设置仅当为一个单独的binary crate时才有效, 如果是test或example模块无法使
 用"-vv"命令选项设置log的level.
@@ -342,9 +352,9 @@ Masters: https://github.com/rust-lang-nursery/futures-rs is a good example.
   : rustup install nightly
   : rustup default nightly
   : rustup target add x86_64-unknown-linux-musl
-  : rustup set default-host x86_64-unknown-linux-musl
+  # rustup set default-host x86_64-unknown-linux-musl
 - 使用rustup自带cargo编译
-  : cargo build --release
+  : cargo build --release --target x86_64-unknown-linux-musl
 
 编译后比普通版大两倍(1.5 vs 5.4). 不过可以接受.
 
@@ -922,20 +932,21 @@ fn sqrt(x: f64) -> f64 {
 - [[https://github.com/alexcrichton/rust-ffi-examples][alexcrichton/rust-ffi-examples: FFI examples written in Rust]]
 
 * cargo
-#+name: 7935cdce-84b1-4d22-a63d-7d0a8580a279
 #+BEGIN_SRC conf :tangle Cargo.toml
   [package]
   name = "test1"
   version = "0.1.0"
+  edition = "2018"
   authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
   [dependencies]
   base64 = "*"
   clap = "*"
+  pyo3 = ">=0.4"
   zip = "*"
   nom = "*"
   timeit = "*"
-  petgraph = "*"
+  petgraph = ">=0.4.13"
   approx = "*"
   nalgebra = "*"
 #+END_SRC
@@ -1313,6 +1324,38 @@ fn sqrt(x: f64) -> f64 {
 #+end_src
 
 * tests
+** pyo3
+:PROPERTIES:
+:header-args: :tangle tests/test_pyo3.rs
+:END:
+#+begin_src rust
+  #![feature(specialization)]
+  use pyo3::prelude::*;
+
+  #[test]
+  fn test_pyo3() -> PyResult<()>{
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      let sys = py.import("sys")?;
+      // let version: String = sys.get("version")?.extract()?;
+      let version = sys.get("version")?;
+      println!("{:#?}", version);
+
+      // how to call python function?
+      // aseio: PyMoudle
+      let aseio = py.import("ase.io")?;
+      // atoms: PyObjectRef
+      let atoms = aseio.call1("read", "/tmp/a.xyz")?;
+      // positions: PyObjectRef
+      let positions = atoms.getattr("positions")?;
+      let positions = positions.call_method0("tolist")?;
+      let x: Vec<Vec<f64>> = positions.extract()?;
+      println!("{:?}", x);
+
+      Ok(())
+  }
+#+end_src
+
 ** nalgebra
 :PROPERTIES:
 :header-args: :tangle tests/test_nalgebra.rs
@@ -1454,15 +1497,15 @@ fn sqrt(x: f64) -> f64 {
 :PROPERTIES:
 :header-args: :tangle tests/test_stats.rs
 :END:
-#+name: c24f7470-3be6-4eab-9e2c-e995bff06d4c
 #+begin_src rust
   #![feature(test)]
   extern crate test;
 
-  use test::stats::Stats;
 
   #[test]
   fn test_stats() {
+      use crate::test::stats::Stats;
+
       let mut x = vec![1.0, 2.0, 0.1];
 
       let v= x.sum();
