@@ -1,0 +1,17 @@
+# cargo
+
+# [[file:~/Workspace/Programming/gosh/parser/parser.note::*cargo][cargo:1]]
+[package]
+name = "scratch"
+version = "0.0.1"
+edition = "2018"
+authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+[dependencies]
+quicli = "*"
+combine = "*"
+nom = "*"
+serde = "*"
+serde-pickle = "*"
+gchemol = { git = "https://github.com/ybyygu/gchemol.git" }
+# cargo:1 ends here
