@@ -1,26 +1,20 @@
-// parser.rs
-// :PROPERTIES:
-// :header-args: :tangle src/parser.rs
-// :END:
-// - 按行读入字串, 攒到足够的行后, 交给nom parser来处理.
-// - 如果nom parser返回Incompele, 继续读满, 再parse.
-// - 如果nom parser返回正常结果, 收集起来, 继续之前的 read/parse循环.
-// - 如果读完全部数据, 处理流程结束.
+// base
 
-
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*base][base:1]]
 use std::fs::File;
 use std::io::{Read, BufRead, BufReader};
 use std::path::{Path};
 
 use quicli::prelude::*;
-use nom::{self, IResult};
-use gchemol::Molecule;
+use nom;
 
+/// A stream parser for large text file
 pub struct TextParser {
     /// The buffer size counted in number of lines
     nlines: usize,
 }
 
+/// General interface for parsing a large text file
 impl Default for TextParser {
     fn default() -> Self {
         TextParser {
@@ -29,13 +23,16 @@ impl Default for TextParser {
     }
 }
 
-type Part<'a> =  f64;
-
 impl TextParser {
-    fn parse<R: Read, F, C>(&self, f: R, parser: F, mut collector: C) -> Result<()>
+    /// Entry point for parsing a text file
+    ///
+    /// # Parameters
+    /// - parser: nom parser
+    /// - collector: a closure to collect parsed results
+    pub fn parse<R: Read, F, C, P: Sized>(&self, f: R, parser: F, mut collector: C) -> Result<()>
     where
-        F: Fn(&str) -> IResult<&str, Part>,
-        C: FnMut(Part),
+        F: Fn(&str) -> nom::IResult<&str, P>,
+        C: FnMut(P),
     {
         // a. prepare data
         let mut reader = BufReader::new(f);
@@ -50,11 +47,15 @@ impl TextParser {
                 debug!("fill data");
                 for _ in 0..self.nlines {
                     // reach EOF
-                    if reader.read_line(&mut chunk)? <= 0 {
+                    if reader.read_line(&mut chunk)? == 0 {
                         eof = true;
                         break;
                     }
                 }
+            } else {
+                // a workaround for nom 4.0 changes: append a magic_eof line to
+                // make stream `complete`
+                chunk.push_str(MAGIC_EOF);
             }
 
             // 1. parse/consume the chunk until we get Incomplete error
@@ -114,13 +115,17 @@ impl TextParser {
             };
 
         }
-        println!("parsing done.");
+        info!("parsing done.");
 
         // c. finish the job
         Ok(())
     }
 }
+// base:1 ends here
 
+// test
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*test][test:1]]
 use gchemol::parser::*;
 
 /// whitespace including one or more spaces or tabs
@@ -135,20 +140,20 @@ macro_rules! sp (
 
 //           TOTAL ENERGY            =       -720.18428 EV
 named!(total_energy<&str, f64>, do_parse!(
-    tag!("TOTAL ENERGY") >>
-        sp!(tag!("="))            >>
-        energy: sp!(double_s)             >>
-        sp!(tag!("EV"))           >>
-        (energy)
+            tag!("TOTAL ENERGY")      >>
+            sp!(tag!("="))            >>
+    energy: sp!(double_s)             >>
+            sp!(tag!("EV"))           >>
+    (energy)
 ));
 
-named!(parse_mopac_output<&str, Part>, do_parse!(
-    take_until!(" ** Cite this program as:") >>
-    take_until!("TOTAL ENERGY            =") >>
+named!(parse_mopac_output<&str, f64>, do_parse!(
+               take_until!(" ** Cite this program as:") >>
+               take_until!("TOTAL ENERGY            =") >>
     energy:    total_energy >>
-        (
-            energy
-        )
+    (
+        energy
+    )
 ));
 
 
@@ -162,3 +167,4 @@ fn test_text_parser() {
 
     parser.parse(f, parse_mopac_output, |p| println!("{:#?}", p)).unwrap();
 }
+// test:1 ends here
