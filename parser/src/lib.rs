@@ -8,6 +8,7 @@
 #[macro_use] extern crate quicli;
 // #[macro_use] extern crate combine;
 
+#[macro_use]
 mod nom_parser;
 mod parser;
 // lib.rs:1 ends here
