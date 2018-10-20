@@ -20,7 +20,7 @@ pub struct TextParser {
 impl Default for TextParser {
     fn default() -> Self {
         TextParser {
-            nlines: 10,
+            nlines: 100,
         }
     }
 }
