@@ -24,6 +24,18 @@ macro_rules! sp (
         }
     )
 );
+
+/// A whitespace wrapper consuming "\r\n" (line-ending)
+named!(pub eol_token<&str, &str>, eat_separator!(&b"\r\n"[..]));
+
+#[macro_export]
+macro_rules! nl (
+    ($i:expr, $($args:tt)*) => (
+        {
+            sep!($i, eol_token, $($args)*)
+        }
+    )
+);
 // macros:1 ends here
 
 // reexport

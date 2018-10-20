@@ -162,3 +162,102 @@ fn test_xyz_parser() {
     ).unwrap();
 }
 // xyz:1 ends here
+
+// base
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*base][base:1]]
+#[derive(Debug, Clone)]
+pub struct Section<'a> {
+    label: &'a str,
+    data_type: &'a str,
+    is_array: bool,
+    array_size: usize,
+}
+
+fn is_section_header(line: &str) -> bool {
+    if line.len() >= 50 {
+        if ! line.starts_with(" ") {
+            return true;
+        }
+    }
+
+    false
+}
+
+// Number of alpha electrons                  I              225
+// Nuclear charges                            R   N=         261
+// Mulliken Charges                           R   N=          11
+named!(read_section_header<&str, Section>, do_parse!(
+    label     : take!(40)  >>
+    data_type : take!(7)   >>
+    array     : take!(2)   >>
+    array_size: read_usize >>
+    (
+        {
+            Section {
+                array_size,
+                label: label.trim(),
+                data_type: data_type.trim(),
+                is_array: array.trim() == "N=",
+            }
+        }
+    )
+));
+
+#[test]
+fn test_fchk_section_header() {
+    let line = "Nuclear charges                            R   N=          11 \n";
+    let (_, s) = read_section_header(line).expect("fchk section header");
+    assert_eq!("Nuclear charges", s.label);
+    assert_eq!("R", s.data_type);
+    assert_eq!(11, s.array_size);
+    assert!(s.is_array);
+
+    let line = "Number of alpha electrons                  I              225\n";
+    let (_, s) = read_section_header(line).expect("fchk section header");
+    assert!(! s.is_array);
+    assert_eq!(225, s.array_size);
+}
+
+// Mulliken Charges                           R   N=          11
+// -2.39981337E-01  7.81413543E-02  7.80914216E-02  7.80894354E-02 -1.38940961E-01
+//  7.51311015E-02  7.51280776E-02 -2.39981300E-01  7.80918915E-02  7.81413535E-02
+//  7.80889625E-02
+fn read_real_scalars(input: &str) -> nom::IResult<&str, Vec<f64>> {
+    let (input, sect) = read_section_header(input)?;
+
+    assert!(sect.is_array);
+    assert_eq!("R", sect.data_type);
+
+    // fortran format: 5E16.8
+    let width = 16;
+    read_scalars_array(input, sect.array_size, width)
+}
+
+// read all members in array. line endings are ignored using nl! macro
+fn read_scalars_array(input: &str, array_size: usize, width: usize) -> nom::IResult<&str, Vec<f64>> {
+    let (input, scalars) = many_m_n!(input,
+                                     array_size,
+                                     array_size,
+                                     nl!(take!(width))
+    )?;
+
+    let array: Vec<f64> = scalars
+        .iter()
+        .map(|s| s.trim().parse().expect("scalar array member"))
+        .collect();
+
+    Ok((input, array))
+}
+
+#[test]
+fn test_parser_fchk_real() {
+    let txt = "Mulliken Charges                           R   N=          11
+ -2.39981337E-01  7.81413543E-02  7.80914216E-02  7.80894354E-02 -1.38940961E-01
+  7.51311015E-02  7.51280776E-02 -2.39981300E-01  7.80918915E-02  7.81413535E-02
+  7.80889625E-02
+";
+    let x = read_real_scalars(txt).expect("fchk real");
+    println!("{:#?}", x);
+}
+// base:1 ends here
