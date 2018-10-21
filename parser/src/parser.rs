@@ -108,7 +108,7 @@ impl TextParser {
             // all done, get out the loop
             if eof {
                 if chunk.len() != 0 {
-                    eprintln!("remained data:\n {:}", chunk);
+                    // eprintln!("remained data:\n {:}", chunk);
                     warn!("remained data:\n {:}", chunk);
                 }
                 break
@@ -163,9 +163,10 @@ fn test_xyz_parser() {
 }
 // xyz:1 ends here
 
-// array data type
+// data type
+// Each data section has data (single or in a array) in different type.
 
-// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*array%20data%20type][array data type:1]]
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*data%20type][data type:1]]
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -224,15 +225,15 @@ fn test_fchk_data_type() {
     let s = " R ";
     let dt = s.parse().expect("fchk data type: R");
     assert_eq!(DataType::Real, dt);
-    println!("w={:#?}", dt.width());
     assert_eq!(dt.width(), 16);
 }
-// array data type:1 ends here
+// data type:1 ends here
 
-// section
+// data section
 // A data section in formatted checkpoint file.
 
-// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*section][section:1]]
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*data%20section][data section:1]]
 /// Represents a section of data in formatted checkpoint file (fchk)
 #[derive(Debug, Clone)]
 pub struct Section<'a> {
@@ -244,6 +245,8 @@ pub struct Section<'a> {
     is_array: bool,
     /// The last item in section header representing section value or array size
     value: &'a str,
+    /// Members of data array
+    data_array: Option<Vec<&'a str>>,
 }
 
 // Number of alpha electrons                  I              225
@@ -261,6 +264,7 @@ named!(read_section_header<&str, Section>, do_parse!(
                 label: label.trim(),
                 data_type: data_type.parse().expect("dt"),
                 is_array: array.trim() == "N=",
+                data_array: None,
             }
         }
     )
@@ -284,6 +288,75 @@ fn test_fchk_section_header() {
     assert!(! s.is_array);
 }
 
+// read all members of data array. line endings are ignored using nl! macro
+fn read_data_array(input: &str, array_size: usize, width: usize) -> nom::IResult<&str, Vec<&str>> {
+    let (input, array) = many_m_n!(input,
+                                   array_size,
+                                   array_size,
+                                   nl!(take!(width))
+    )?;
+
+    Ok((input, array))
+}
+
+/// Read data for a named section
+pub fn read_section<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str, Section<'a>> {
+    // goto section named as `label`
+    // jump to the line starts with `label`
+    let tag = format!("\n{}", label);
+    let (input, _) = take_until!(input, tag.as_str())?;
+    // consume '\n'
+    let (input, _) = take!(input, 1)?;
+
+    // parse section header
+    let (mut input, mut sect) = read_section_header(input)?;
+    let width = sect.data_type.width();
+
+    // parse array data
+    if sect.is_array {
+        use nom::{Err::Failure, ErrorKind};
+
+        let array_size: usize = sect.value.trim().parse().map_err(
+            |e| {
+                eprintln!("failed to parse array size{:?}", e);
+
+                let blah = sect.value;
+                Failure(error_node_position!(blah,
+                                             ErrorKind::Custom(42),
+                                             error_position!(blah, ErrorKind::ParseTo)))
+            }
+        )?;
+        // let (_, array_size) = add_return_error!(sect.value, nom::ErrorKind::Custom(42), unsigned_digit)?;
+        let (input, array) = read_data_array(input, array_size, width)?;
+        sect.data_array = Some(array);
+        return Ok((input, sect));
+    }
+
+    Ok((input, sect))
+}
+
+#[test]
+fn test_read_section() {
+    let txt = "Title Card Required
+SP        RB3LYP                                                      STO-3G
+Number of atoms                            I               11
+Charge                                     I                0
+Multiplicity                               I                1
+Nuclear charges                            R   N=          11
+  6.00000000E+00  1.00000000E+00  1.00000000E+00  1.00000000E+00  6.00000000E+00
+  1.00000000E+00  1.00000000E+00  6.00000000E+00  1.00000000E+00  1.00000000E+00
+  1.00000000E+00
+";
+    // let x = read_section(txt, "Nuclear charges").expect("fchk section");
+    let x = read_section(txt, "Charge");
+    // let x = read_section(txt, "Nuclear charges");
+    println!("{:#?}", x);
+}
+// data section:1 ends here
+
+// data reader
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*data%20reader][data reader:1]]
 fn is_section_header(line: &str) -> bool {
     if line.len() >= 50 {
         if ! line.starts_with(" ") {
@@ -295,50 +368,64 @@ fn is_section_header(line: &str) -> bool {
 }
 
 // Total Energy                               R     -1.177266205968928E+02
-fn read_real_scalar(input: &str) -> nom::IResult<&str, f64> {
+pub fn read_total_energy(input: &str) -> nom::IResult<&str, f64> {
+    let (input, sect) = read_section(input, "Total Energy")?;
+    assert_eq!(sect.data_type, DataType::Real);
+    assert!(! sect.is_array);
+
+    let energy = sect.value.trim().parse().expect("total energy");
+    Ok((input, energy))
+}
+
+// Cartesian Gradient                         R   N=          33
+pub fn read_cartesian_gradient(input: &str) -> nom::IResult<&str, (f64, f64, f64)> {
+    unimplemented!()
+}
+
+// Dipole Moment                              R   N=           3
+pub fn read_dipole_moment(input: &str) -> nom::IResult<&str, (f64, f64, f64)> {
     unimplemented!()
 }
 
 // Mulliken Charges                           R   N=          11
-// -2.39981337E-01  7.81413543E-02  7.80914216E-02  7.80894354E-02 -1.38940961E-01
-//  7.51311015E-02  7.51280776E-02 -2.39981300E-01  7.80918915E-02  7.81413535E-02
-//  7.80889625E-02
-fn read_real_scalars(input: &str) -> nom::IResult<&str, Vec<f64>> {
-    let (input, sect) = read_section_header(input)?;
-
+pub fn read_mulliken_charges(input: &str) -> nom::IResult<&str, Vec<f64>> {
+    let (input, sect) = read_section(input, "Mulliken Charges")?;
+    assert_eq!(sect.data_type, DataType::Real);
     assert!(sect.is_array);
-    assert_eq!(DataType::Real, sect.data_type);
 
-    let width = sect.data_type.width();
-    let array_size: usize = sect.value.parse().unwrap();
-    read_scalars_array(input, array_size, width)
+    let charges = if let Some(items) = sect.data_array {
+        items
+            .iter()
+            .map(|v| v.trim().parse().expect("Mulliken charge"))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    Ok((input, charges))
 }
 
-// read all members in array. line endings are ignored using nl! macro
-fn read_scalars_array(input: &str, array_size: usize, width: usize) -> nom::IResult<&str, Vec<f64>> {
-    let (input, scalars) = many_m_n!(input,
-                                     array_size,
-                                     array_size,
-                                     nl!(take!(width))
-    )?;
+// Relevant data for blackbox model calculation
+pub fn read_model_properties(input: &str) -> nom::IResult<&str, (f64, Vec<f64>)> {
+    let (input, energy) = read_total_energy(input)?;
+    // let (input, gradients) = read_cartesian_gradient(input)?
+    // let (input, dipoles) = read_dipole_moment(input)?
+    let (input, charges) = read_mulliken_charges(input)?;
 
-    // FIXME: use nom?
-    let array: Vec<f64> = scalars
-        .iter()
-        .map(|s| s.trim().parse().expect("scalar array member"))
-        .collect();
-
-    Ok((input, array))
+    Ok((input, (energy, charges)))
 }
 
 #[test]
-fn test_parser_fchk_real() {
-    let txt = "Mulliken Charges                           R   N=          11
- -2.39981337E-01  7.81413543E-02  7.80914216E-02  7.80894354E-02 -1.38940961E-01
-  7.51311015E-02  7.51280776E-02 -2.39981300E-01  7.80918915E-02  7.81413535E-02
-  7.80889625E-02
-";
-    let x = read_real_scalars(txt).expect("fchk real");
-    println!("{:#?}", x);
+fn test_fchk_reader() {
+    use gchemol::io;
+
+    let fname = "tests/Test.FChk";
+
+    let mut parser = TextParser::default();
+    let f = File::open(fname).expect("fchk test file");
+
+    // parser.parse(f, read_total_energy, |p| println!("{:#?}", p)).unwrap();
+    parser.parse(f, read_model_properties, |p| println!("{:#?}", p)).unwrap();
+
 }
-// section:1 ends here
+// data reader:1 ends here
