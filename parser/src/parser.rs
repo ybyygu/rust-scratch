@@ -163,15 +163,125 @@ fn test_xyz_parser() {
 }
 // xyz:1 ends here
 
-// base
+// array data type
 
-// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*base][base:1]]
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*array%20data%20type][array data type:1]]
+use std::str::FromStr;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DataType {
+    Integer,
+    Real,
+    Logical,
+    Character1,
+    Character2,
+}
+
+impl DataType {
+    pub fn width(&self) -> usize {
+        use self::DataType::*;
+
+        match self {
+            // I, fortran format: 6I12
+            Integer    => 12,
+            // R, fortran format: 5E16.8
+            Real       => 16,
+            // L, fortran format: 72L1
+            Logical    => 1,
+            // C, fortran format: 5A12
+            Character1 => 12,
+            // H, fortran format: 9A8
+            Character2 => 8,
+        }
+    }
+}
+
+impl FromStr for DataType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let dt = match s.trim() {
+            "I" => DataType::Integer,
+            "R" => DataType::Real,
+            "C" => DataType::Character1,
+            "H" => DataType::Character2,
+            _  => {
+                bail!("unkown data type: {}", s.trim());
+            }
+        };
+
+        Ok(dt)
+    }
+}
+
+#[test]
+fn test_fchk_data_type() {
+    let s = "  I";
+    let dt = s.parse().expect("fchk data type: I");
+    assert_eq!(DataType::Integer, dt);
+    assert_eq!(dt.width(), 12);
+
+    let s = " R ";
+    let dt = s.parse().expect("fchk data type: R");
+    assert_eq!(DataType::Real, dt);
+    println!("w={:#?}", dt.width());
+    assert_eq!(dt.width(), 16);
+}
+// array data type:1 ends here
+
+// section
+// A data section in formatted checkpoint file.
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*section][section:1]]
+/// Represents a section of data in formatted checkpoint file (fchk)
 #[derive(Debug, Clone)]
 pub struct Section<'a> {
+    /// An informative section name
     label: &'a str,
-    data_type: &'a str,
+    /// Data type: R, I, C, L, H
+    data_type: DataType,
+    /// if there is array data followed by one or more succeeding lines
     is_array: bool,
-    array_size: usize,
+    /// The last item in section header representing section value or array size
+    value: &'a str,
+}
+
+// Number of alpha electrons                  I              225
+// Nuclear charges                            R   N=         261
+// Mulliken Charges                           R   N=          11
+named!(read_section_header<&str, Section>, do_parse!(
+    label     : take!(40)  >>
+    data_type : take!(7)   >>
+    array     : take!(2)   >>
+    value     : read_line  >>
+    (
+        {
+            Section {
+                value: value.trim(),
+                label: label.trim(),
+                data_type: data_type.parse().expect("dt"),
+                is_array: array.trim() == "N=",
+            }
+        }
+    )
+));
+
+#[test]
+fn test_fchk_section_header() {
+    let line = "Nuclear charges                            R   N=          11 \n";
+    let (_, s) = read_section_header(line).expect("fchk section header");
+    assert_eq!("Nuclear charges", s.label);
+    assert_eq!(DataType::Real, s.data_type);
+    assert_eq!("11", s.value);
+    assert!(s.is_array);
+
+    let line = "Number of alpha electrons                  I              225\n";
+    let (_, s) = read_section_header(line).expect("fchk section header");
+    assert!(! s.is_array);
+
+    let line = "Total Energy                               R     -1.177266205968928E+02\n";
+    let (_, s) = read_section_header(line).expect("fchk section header");
+    assert!(! s.is_array);
 }
 
 fn is_section_header(line: &str) -> bool {
@@ -184,39 +294,9 @@ fn is_section_header(line: &str) -> bool {
     false
 }
 
-// Number of alpha electrons                  I              225
-// Nuclear charges                            R   N=         261
-// Mulliken Charges                           R   N=          11
-named!(read_section_header<&str, Section>, do_parse!(
-    label     : take!(40)  >>
-    data_type : take!(7)   >>
-    array     : take!(2)   >>
-    array_size: read_usize >>
-    (
-        {
-            Section {
-                array_size,
-                label: label.trim(),
-                data_type: data_type.trim(),
-                is_array: array.trim() == "N=",
-            }
-        }
-    )
-));
-
-#[test]
-fn test_fchk_section_header() {
-    let line = "Nuclear charges                            R   N=          11 \n";
-    let (_, s) = read_section_header(line).expect("fchk section header");
-    assert_eq!("Nuclear charges", s.label);
-    assert_eq!("R", s.data_type);
-    assert_eq!(11, s.array_size);
-    assert!(s.is_array);
-
-    let line = "Number of alpha electrons                  I              225\n";
-    let (_, s) = read_section_header(line).expect("fchk section header");
-    assert!(! s.is_array);
-    assert_eq!(225, s.array_size);
+// Total Energy                               R     -1.177266205968928E+02
+fn read_real_scalar(input: &str) -> nom::IResult<&str, f64> {
+    unimplemented!()
 }
 
 // Mulliken Charges                           R   N=          11
@@ -227,11 +307,11 @@ fn read_real_scalars(input: &str) -> nom::IResult<&str, Vec<f64>> {
     let (input, sect) = read_section_header(input)?;
 
     assert!(sect.is_array);
-    assert_eq!("R", sect.data_type);
+    assert_eq!(DataType::Real, sect.data_type);
 
-    // fortran format: 5E16.8
-    let width = 16;
-    read_scalars_array(input, sect.array_size, width)
+    let width = sect.data_type.width();
+    let array_size: usize = sect.value.parse().unwrap();
+    read_scalars_array(input, array_size, width)
 }
 
 // read all members in array. line endings are ignored using nl! macro
@@ -242,6 +322,7 @@ fn read_scalars_array(input: &str, array_size: usize, width: usize) -> nom::IRes
                                      nl!(take!(width))
     )?;
 
+    // FIXME: use nom?
     let array: Vec<f64> = scalars
         .iter()
         .map(|s| s.trim().parse().expect("scalar array member"))
@@ -260,4 +341,4 @@ fn test_parser_fchk_real() {
     let x = read_real_scalars(txt).expect("fchk real");
     println!("{:#?}", x);
 }
-// base:1 ends here
+// section:1 ends here
