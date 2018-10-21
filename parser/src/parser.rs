@@ -355,18 +355,9 @@ Nuclear charges                            R   N=          11
 // data section:1 ends here
 
 // data reader
+// Various readers for different data sections
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*data%20reader][data reader:1]]
-fn is_section_header(line: &str) -> bool {
-    if line.len() >= 50 {
-        if ! line.starts_with(" ") {
-            return true;
-        }
-    }
-
-    false
-}
-
 // Total Energy                               R     -1.177266205968928E+02
 pub fn read_total_energy(input: &str) -> nom::IResult<&str, f64> {
     let (input, sect) = read_section(input, "Total Energy")?;
