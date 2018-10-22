@@ -79,7 +79,9 @@ ATOM      1  O2  MOL     2      -4.808   4.768   2.469  1.00  0.00           O
 ATOM      2  O3  MOL     2      -6.684   6.549   1.983  1.00  0.00           O
 ATOM      3 T1   MOL     2      -5.234   6.009   1.536  1.00  0.00          Si1+
 ";
-    let (r, v) = read_lattice(lines).expect("pdb lattice");
+    let (_, mut v) = read_lattice(lines).expect("pdb lattice");
+    let abc = v.lengths();
+    assert_eq!(abc[1], 18.126);
 }
 // crystal:1 ends here
 
@@ -91,13 +93,11 @@ ATOM      3 T1   MOL     2      -5.234   6.009   1.536  1.00  0.00          Si1+
 // 79 - 80        LString(2)    charge       Charge  on the atom.
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*element][element:1]]
-fn guess_element<'a>(name: &'a str, remained: Option<&'a str>) -> Option<&'a str> {
+fn guess_element<'a>(name: &'a str, r: &'a str) -> Option<&'a str> {
     // 1. return element symbol without whitespace
-    if let Some(r) = remained {
-        if let Some(sym) = r.get(22..24).and_then(|s| Some(s.trim())) {
-            if ! sym.is_empty() {
-                return Some(sym);
-            }
+    if let Some(sym) = r.get(22..24).and_then(|s| Some(s.trim())) {
+        if ! sym.is_empty() {
+            return Some(sym);
         }
     }
 
@@ -114,20 +114,20 @@ fn guess_element<'a>(name: &'a str, remained: Option<&'a str>) -> Option<&'a str
 #[test]
 fn test_guess_element() {
     // case 1: with columns containing element symbols
-    let x = guess_element("1CA ", Some("  1.00  0.00      UC1 SI"));
+    let x = guess_element("1CA ", "  1.00  0.00      UC1 SI");
     assert_eq!(Some("SI"), x);
-    let x = guess_element("1CA ", Some("  1.00  0.00      UC1  I"));
+    let x = guess_element("1CA ", "  1.00  0.00      UC1  I");
     assert_eq!(Some("I"), x);
 
     // case 2: without columns containing element symbols
-    let x = guess_element("CA  ", None);
+    let x = guess_element("CA  ", "");
     assert_eq!(Some("C"), x);
-    let x = guess_element("1SA  ", None);
+    let x = guess_element("1SA  ", "");
     assert_eq!(Some("S"), x);
-    let x = guess_element(" N B ", None);
+    let x = guess_element(" N B ", "");
     assert_eq!(Some("N"), x);
     // when the remained is just whitespace
-    let x = guess_element(" H   ", Some("                        "));
+    let x = guess_element(" H   ", "                        ");
     assert_eq!(Some("H"), x);
 }
 // element:1 ends here
@@ -160,7 +160,7 @@ named!(read_atom_record<&str, (usize, Atom)>, do_parse!(
     x        : flat_map!(take!(8), sp!(parse_to!(f64)))   >> // 31-38
     y        : flat_map!(take!(8), sp!(parse_to!(f64)))   >> // 39-46
     z        : flat_map!(take!(8), sp!(parse_to!(f64)))   >> // 47-54
-    rest     : opt!(read_line)                            >>
+    rest     : read_line                                  >>
     (
         {
             // TODO: take more attributes
@@ -199,6 +199,10 @@ fn test_pdb_atom() {
     assert_eq!("S", a.symbol());
     assert_eq!([3.484, 3.484, 3.474], a.position());
 
+    let line = "ATOM      3  SI2 SIO2X   1       3.484   3.484   3.474  1.00  0.00      UC1 SI\n";
+    let (_, (i, a)) = read_atom_record(line).expect("pdb atom");
+    assert_eq!("Si", a.symbol());
+
     let line = "HETATM 1632  O1S MID E   5      -6.883   5.767  26.435  1.00 26.56           O \n";
     let (_, (i, a)) = read_atom_record(line).expect("pdb atom");
     assert_eq!(1632, i);
@@ -210,6 +214,7 @@ fn test_pdb_atom() {
     assert_eq!(3, i);
     assert_eq!(a.symbol(), b.symbol());
     assert_eq!(a.position(), b.position());
+
 }
 
 named!(read_atoms<&str, Vec<(usize, Atom)>>, do_parse!(
@@ -259,7 +264,7 @@ use gchemol::Bond;
 named!(read_bond_record<&str, Vec<(usize, usize)>>, do_parse!(
              tag!("CONECT")                       >>
     current: sp!(unsigned_digit)                  >>
-    others : many_m_n!(1, 4, sp!(unsigned_digit)) >>
+    others : many1!(sp!(unsigned_digit))          >>
              sp!(line_ending)                     >>
     (
         {
@@ -348,12 +353,8 @@ use std::collections::HashMap;
 // quick jump to crystal record (optional)
 named!(jump1<&str, ()>, do_parse!(
     many_till!(
-        take_until!("\n"),
-        peek!(alt_complete!(
-            tag!("\nCRYST1")
-                | tag!("\nATOM")
-                | tag!("\nHETATM")))) >>
-    take!(1)                          >> // consume new line char
+        read_line,
+        peek!(alt!(tag!("CRYST1") | tag!("ATOM") | tag!("HETATM")))) >>
     (
         ()
     )
@@ -362,19 +363,16 @@ named!(jump1<&str, ()>, do_parse!(
 // quick jump to Atom records
 named!(jump2<&str, ()>, do_parse!(
     many_till!(
-        take_until!("\n"),
-        peek!(alt_complete!(
-            tag!("\nATOM") |
-            tag!("\nHETATM")))) >>
-    take!(1)                    >>  // consume new line char
+        read_line,
+        peek!(alt_complete!(tag!("ATOM") | tag!("HETATM")))) >>
     (
         ()
     )
 ));
 
-// recognize TER record
-named!(ter_record<&str, ()>, do_parse!(
-    tag!("TER") >> read_line >>
+// recognize optional record between Atom and Bond
+named!(sep_atom_bond<&str, ()>, do_parse!(
+    alt!(tag!("TER") | tag!("END") ) >> read_line >>
     (
         ()
     )
@@ -383,9 +381,9 @@ named!(ter_record<&str, ()>, do_parse!(
 // Add atoms/bonds into Molecule `mol`
 pub fn parse_atoms_and_bonds<'a>(input: &'a str, mol: &mut Molecule) -> nom::IResult<&'a str, ()> {
     do_parse!(input,
-              atoms: read_atoms       >>
-                     opt!(ter_record) >>
-              bonds: read_bonds       >>
+              atoms: read_atoms          >>
+                     opt!(sep_atom_bond) >>
+              bonds: read_bonds          >>
               (
                   {
                       // bond records lookup table
@@ -417,9 +415,12 @@ pub fn read_molecule(input: &str) -> nom::IResult<&str, Molecule> {
         mol.set_lattice(lat);
 
         input
-    }
+    } else {
+        input
+    };
+
     // 2. read atom records and bond records
-    else if line.starts_with("ATOM") || line.starts_with("HETATM") {
+    let input = if line.starts_with("ATOM") || line.starts_with("HETATM") {
         let (input, _) = parse_atoms_and_bonds(input, &mut mol)?;
         input
     }
@@ -480,7 +481,8 @@ END\n\n";
     assert_eq!(13, v.natoms());
     assert_eq!(2, v.nbonds());
 
-        let lines = "SCALE3      0.000000  0.000000  0.132153        0.00000
+    let lines = "REMARK   Created:  2018-10-22T12:36:28Z
+SCALE3      0.000000  0.000000  0.132153        0.00000
 ATOM      1  O2  MOL     2      -4.808   4.768   2.469  1.00  0.00           O
 ATOM      2  O3  MOL     2      -6.684   6.549   1.983  1.00  0.00           O
 ATOM      3 T1   MOL     2      -5.234   6.009   1.536  1.00  0.00          Si1+
@@ -495,10 +497,52 @@ ATOM     11  O3  MOL     2      -2.330  -9.063   1.983  1.00  0.00           O
 ATOM     12 T1   MOL     2      -2.587  -7.537   1.536  1.00  0.00          Si1+
 ATOM     13  O1  MOL     2      -7.395  -9.064   1.688  1.00  0.00           O
 \n\n\n";
-    // let lines = format!("{}{}", lines, MAGIC_EOF);
 
     let (r, v) = read_molecule(&lines).expect("pdb molecule no bonds");
     assert_eq!(13, v.natoms());
     assert_eq!(0, v.nbonds());
+    let txt = "CRYST1   54.758   54.758   55.584  90.00  90.00  90.00 P 1           1
+ATOM      1  SI1 SIO2X   1       1.494   1.494   0.000  1.00  0.00      UC1 SI
+ATOM      2  O11 SIO2X   1       1.194   0.514   1.240  1.00  0.00      UC1  O
+ATOM      3  SI2 SIO2X   1       3.484   3.484   3.474  1.00  0.00      UC1 SI
+ATOM      4  O12 SIO2X   1       3.784   4.464   4.714  1.00  0.00      UC1  O
+ATOM      5  SI3 SIO2X   1       0.995   3.983   1.737  1.00  0.00      UC1 SI
+ATOM      6  O13 SIO2X   1       1.975   3.683   2.977  1.00  0.00      UC1  O
+ATOM      7  SI4 SIO2X   1       3.983   0.995   5.211  1.00  0.00      UC1 SI
+ATOM      8  O14 SIO2X   1       3.003   1.295   6.451  1.00  0.00      UC1  O
+ATOM      9  O21 SIO2X   1       1.295   3.003   0.497  1.00  0.00      UC1  O
+ATOM     10  O22 SIO2X   1       3.683   1.975   3.971  1.00  0.00      UC1  O
+ATOM     11  O23 SIO2X   1       0.514   1.194   5.708  1.00  0.00      UC1  O
+ATOM     12  O24 SIO2X   1       4.464   3.784   2.234  1.00  0.00      UC1  O
+END\n
+";
+    let (_, v) = read_molecule(&txt).expect("pdb crystal");
+    assert_eq!(12, v.natoms());
+    assert!(v.lattice.is_some());
 }
 // molecule:1 ends here
+
+// test
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*test][test:1]]
+#[test]
+fn test_pdb_reader() {
+    use std::fs::File;
+    use gchemol::io;
+
+    let fname = "tests/pdb/ase.pdb";
+    let fname = "tests/pdb/gview.pdb";
+    let fname = "tests/pdb/chem3d.pdb";
+    let fname = "tests/pdb/multi-babel.pdb";
+    let fname = "tests/pdb/LTL-zeolite-ms.pdb";
+    let fname = "tests/pdb/tyr-33-conf1.pdb";
+    let fname = "tests/pdb/sio2.pdb";
+    let fname = "tests/pdb/1PPC_ligand.pdb";
+
+    let mut parser = TextParser::default();
+    let f = File::open(fname).expect("fchk test file");
+
+    let mut i = 0;
+    parser.parse(f, read_molecule, |p| println!("mol {:}", {i+=1; i})).unwrap();
+}
+// test:1 ends here
