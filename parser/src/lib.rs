@@ -11,4 +11,8 @@
 #[macro_use]
 mod nom_parser;
 mod parser;
+mod pdb;
+
+pub use self::nom_parser::*;
+pub use self::parser::*;
 // lib.rs:1 ends here

@@ -2,7 +2,7 @@
 
 # [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*cargo][cargo:1]]
 [package]
-name = "scratch"
+name = "textparser"
 version = "0.0.1"
 edition = "2018"
 authors = ["Wenping Guo <ybyygu@gmail.com>"]

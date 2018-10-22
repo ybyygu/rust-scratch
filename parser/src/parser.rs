@@ -108,8 +108,9 @@ impl TextParser {
             // all done, get out the loop
             if eof {
                 if chunk.len() != 0 {
-                    // eprintln!("remained data:\n {:}", chunk);
-                    warn!("remained data:\n {:}", chunk);
+                    if chunk.trim() != MAGIC_EOF.trim() {
+                        eprintln!("remained data:\n {:}", chunk);
+                    }
                 }
                 break
             };
