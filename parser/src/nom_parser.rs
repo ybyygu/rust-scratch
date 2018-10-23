@@ -14,7 +14,7 @@ pub const MAGIC_EOF: &str = "\n\nxTHIS_IS_THE=MAGIC_END_OF_FILE\n";
 named!(pub eof<&str, &str>, tag!(MAGIC_EOF));
 
 /// A whitespace wrapper consuming " \t\r" (no newline)
-named!(pub space_token<&str, &str>, eat_separator!(&b" \t"[..]));
+named!(pub space_token<&str, &str>, eat_separator!(&b" \t\r"[..]));
 
 #[macro_export]
 macro_rules! sp (
@@ -36,6 +36,30 @@ macro_rules! nl (
         }
     )
 );
+
+#[test]
+fn test_parser_sp() {
+    // will consume space between each token.
+    let _  = sp!(" x a b c\t x d",
+                tuple!(tag!("x"),
+                       tag!("a"),
+                       tag!("b"),
+                       tag!("c")
+                )).expect("parser sp test1");
+
+
+    // automatically remove line carriage char `\r` in DOS format
+    let _ = sp!(" x\t a b c\r\nx d\r\n",
+                     pair!(
+                         tuple!(tag!("x"),
+                                tag!("a"),
+                                tag!("b"),
+                                tag!("c")
+                         ),
+                         tag!("\nx")
+                     )
+    ).expect("parser sp test2");
+}
 // macros:1 ends here
 
 // reexport
@@ -153,10 +177,12 @@ fn test_parser_xyz_array() {
 named!(pub read_usize<&str, usize>, sp!(terminated!(unsigned_digit, eol)));
 
 /// Parse a line containing many unsigned integers
-named!(pub read_usize_many<&str, Vec<usize>>, terminated!(
-    many1!(sp!(unsigned_digit)),
-    sp!(eol)
-));
+named!(pub read_usize_many<&str, Vec<usize>>,
+       sp!(terminated!(
+           many1!(unsigned_digit),
+           eol
+       ))
+);
 
 #[test]
 fn test_parser_usize_many() {
@@ -166,12 +192,14 @@ fn test_parser_usize_many() {
 }
 
 /// Parse a line containing a float number
-named!(pub read_f64<&str, f64>, sp!(terminated!(double, sp!(eol))));
+named!(pub read_f64<&str, f64>, sp!(terminated!(double, eol)));
 
 /// Parse a line containing many float numbers
-named!(pub read_f64_many<&str, Vec<f64>>, terminated!(
-    many1!(sp!(double)),
-    sp!(eol)
+named!(pub read_f64_many<&str, Vec<f64>>, sp!(
+    terminated!(
+        many1!(double),
+        eol
+    )
 ));
 
 #[test]
@@ -191,6 +219,10 @@ named!(pub read_until_eol<&str, &str>, terminated!(
     line_ending
 ));
 
+// /// # Note
+// /// Use `sp!` macro to remove the remaining `\r` char in DOS format
+// named!(pub read_line<&str, &str>, take_until_and_consume!("\n"));
+
 /// Read a single line, possible faster than read_until_eol?
 #[inline]
 pub fn read_line(input: &str) -> nom::IResult<&str, &str> {
@@ -204,8 +236,6 @@ pub fn read_line(input: &str) -> nom::IResult<&str, &str> {
         Ok((rest, line))
     }
 }
-
-// named!(pub read_line<&str, &str>, take_until_and_consume!("\n"));
 
 #[test]
 fn test_parser_read_until_eol() {
@@ -261,12 +291,14 @@ use gchemol::{Atom, Molecule};
 /// Create Atom object from xyz line
 /// # Example
 /// C -11.4286  1.7645  0.0000
-named!(pub read_atom_xyz<&str, Atom>, do_parse!(
-    sym      : sp!(alt!(nom::alpha|nom::digit)) >> // element symbol, "1" or "H"
-    position : sp!(xyz_array)                   >>
-               read_line                        >> // ignore the remaining characters
-    (
-        Atom::new(sym, position)
+named!(pub read_atom_xyz<&str, Atom>, sp!(
+    do_parse!(
+        sym      : alt!(nom::alpha|nom::digit) >> // element symbol, "1" or "H"
+        position : xyz_array                   >>
+                   read_line                   >> // ignore the remaining characters
+        (
+            Atom::new(sym, position)
+        )
     )
 ));
 

@@ -18,11 +18,51 @@ use nom::IResult;
 
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*atom][atom:1]]
+named!(read_atoms<&str, Vec<(usize, Atom)>>, preceded!(
+    ws!(tag!("@<TRIPOS>ATOM")),
+    many0!(atom_record)
+));
+
+#[test]
+fn test_mol2_get_atoms() {
+    let lines = "
+@<TRIPOS>ATOM
+      1 N           1.3863   -0.2920    0.0135 N.ar    1  UNL1       -0.2603
+      2 N          -1.3863    0.2923    0.0068 N.ar    1  UNL1       -0.2603
+      3 C           0.9188    0.9708   -0.0188 C.ar    1  UNL1        0.0456
+      4 C          -0.4489    1.2590   -0.0221 C.ar    1  UNL1        0.0456
+      5 C          -0.9188   -0.9709    0.0073 C.ar    1  UNL1        0.0456
+      6 C           0.4489   -1.2591    0.0106 C.ar    1  UNL1        0.0456
+      7 H           1.6611    1.7660   -0.0258 H       1  UNL1        0.0845
+      8 H          -0.8071    2.2860   -0.0318 H       1  UNL1        0.0845
+      9 H           0.8071   -2.2861    0.0273 H       1  UNL1        0.0845
+     10 H          -1.6611   -1.7660    0.0214 H       1  UNL1        0.0845
+
+";
+    let (_, atoms) = read_atoms(lines).expect("mol2 atoms");
+    assert_eq!(10, atoms.len());
+}
+
+fn format_atom(a: &Atom) -> String {
+    let position = a.position();
+    format!("{name:8} {x:-12.5} {y:-12.5} {z:-12.5} {symbol:8} {subst_id:5} {subst_name:8} {charge:-6.4}\n",
+            name  = a.label(),
+            x = position[0],
+            y = position[1],
+            z = position[2],
+            // FIXME:
+            symbol = get_atom_type(a),
+            subst_id = 1,
+            subst_name = "SUBUNIT",
+            charge = 0.0,
+    )
+}
+
 // parse mol2 atom type. example records:
 // C.2, C.3, C.ar
 named!(mm_type<&str, (&str, Option<&str>)>, do_parse!(
-    symbol: alpha                                      >>
-    mtype :   opt!(preceded!(tag!("."), alphanumeric)) >>
+    symbol: alpha                                    >>
+    mtype : opt!(preceded!(tag!("."), alphanumeric)) >>
     (
         (symbol, mtype)
     )
@@ -43,16 +83,16 @@ fn test_mol2_mmtype() {
     assert_eq!(None, mtype);
 }
 
-named!(atom_record<&str, (usize, Atom)>, do_parse!(
-    id        : sp!(unsigned_digit)         >>     // atom index
-    name      : sp!(not_space)              >>     // atom name
-    x         : sp!(double)                 >>     // cartesian coordinates
-    y         : sp!(double)                 >>
-    z         : sp!(double)                 >>
-    emtype    : sp!(mm_type)                >>
+named!(atom_record<&str, (usize, Atom)>, sp!(do_parse!(
+    id        : unsigned_digit         >>     // atom index
+    name      : not_space              >>     // atom name
+    x         : double                 >>     // cartesian coordinates
+    y         : double                 >>
+    z         : double                 >>
+    emtype    : mm_type                >>
     // substructure and partial charge, which could be omitted
     optional  : opt!(atom_subst_and_charge) >>
-                sp!(line_ending)            >>
+                tag!("\n")             >>
     (
         {
             let (e, mtype) = emtype;
@@ -61,18 +101,18 @@ named!(atom_record<&str, (usize, Atom)>, do_parse!(
             (id, a)
         }
     )
-));
+)));
 
 // substructure id and subtructure name
-named!(atom_subst_and_charge<&str, (usize, &str, Option<f64>)>, do_parse!(
-    subst_id   : sp!(unsigned_digit)            >>
-    subst_name : sp!(not_space)                 >>
-    charge     : opt!(sp!(double))            >>
-    status_bit : opt!(sp!(alpha))               >>
+named!(atom_subst_and_charge<&str, (usize, &str, Option<f64>)>, sp!(do_parse!(
+    subst_id   : unsigned_digit            >>
+    subst_name : not_space                 >>
+    charge     : opt!(double)              >>
+    status_bit : opt!(alpha)               >>
     (
         (subst_id, subst_name, charge)
     )
-));
+)));
 
 #[test]
 fn test_formats_mol2_atom() {
@@ -90,68 +130,21 @@ fn test_formats_mol2_atom() {
     assert_eq!("C", a.symbol());
 }
 
-named!(get_atoms_from<&str, Vec<(usize, Atom)>>, do_parse!(
-           ws!(tag!("@<TRIPOS>ATOM")) >>
-    atoms: many0!(atom_record)        >>
-    (
-        atoms
-    )
-));
-
-#[test]
-fn test_formats_mol2_get_atoms() {
-    let lines = "
-@<TRIPOS>ATOM
-      1 N           1.3863   -0.2920    0.0135 N.ar    1  UNL1       -0.2603
-      2 N          -1.3863    0.2923    0.0068 N.ar    1  UNL1       -0.2603
-      3 C           0.9188    0.9708   -0.0188 C.ar    1  UNL1        0.0456
-      4 C          -0.4489    1.2590   -0.0221 C.ar    1  UNL1        0.0456
-      5 C          -0.9188   -0.9709    0.0073 C.ar    1  UNL1        0.0456
-      6 C           0.4489   -1.2591    0.0106 C.ar    1  UNL1        0.0456
-      7 H           1.6611    1.7660   -0.0258 H       1  UNL1        0.0845
-      8 H          -0.8071    2.2860   -0.0318 H       1  UNL1        0.0845
-      9 H           0.8071   -2.2861    0.0273 H       1  UNL1        0.0845
-     10 H          -1.6611   -1.7660    0.0214 H       1  UNL1        0.0845
-
-";
-    let (_, atoms) = get_atoms_from(lines)
-        .expect("mol2 atoms");
-    assert_eq!(10, atoms.len());
-    let (_, atoms) = get_atoms_from("@<TRIPOS>ATOM\n@<TRIPOS>BOND\n")
-        .expect("mol2 atoms: missing atom");
-    assert_eq!(0, atoms.len());
-}
-
-fn format_atom(a: &Atom) -> String {
-    let position = a.position();
-    format!("{name:8} {x:-12.5} {y:-12.5} {z:-12.5} {symbol:8} {subst_id:5} {subst_name:8} {charge:-6.4}\n",
-            name  = a.label(),
-            x = position[0],
-            y = position[1],
-            z = position[2],
-            // FIXME:
-            symbol = get_atom_type(a),
-            subst_id = 1,
-            subst_name = "SUBUNIT",
-            charge = 0.0,
-    )
-}
-
 /// simple translation without considering the bonding pattern
 /// http://www.sdsc.edu/CCMS/Packages/cambridge/pluto/atom_types.html
 /// I just want material studio happy to accept my .mol2 file
 fn get_atom_type(atom: &Atom) -> &str {
     match atom.symbol() {
-        "C" => "C.3",
-        "P" => "P.3",
+        "C"  => "C.3",
+        "P"  => "P.3",
         "Co" => "Co.oh",
         "Ru" => "Ru.oh",
-        "O" => "O.2",
-        "N" => "N.3",
-        "S" => "S.2",
+        "O"  => "O.2",
+        "N"  => "N.3",
+        "S"  => "S.2",
         "Ti" => "Ti.oh",
         "Cr" => "Cr.oh",
-        _ => atom.symbol(),
+        _    => atom.symbol(),
     }
 }
 // atom:1 ends here
@@ -167,12 +160,12 @@ fn get_atom_type(atom: &Atom) -> &str {
 
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*bond][bond:1]]
-named!(get_bond<&str, (usize, usize, Bond)>, do_parse!(
-        sp!(unsigned_digit) >>
-    n1: sp!(unsigned_digit) >>
-    n2: sp!(unsigned_digit) >>
-    bo: sp!(alphanumeric)   >>
-        read_until_eol      >>
+named!(get_bond<&str, (usize, usize, Bond)>, sp!(do_parse!(
+        unsigned_digit >>
+    n1: unsigned_digit >>
+    n2: unsigned_digit >>
+    bo: alphanumeric   >>
+        read_line      >>
     (
         {
             let bond = match bo
@@ -190,7 +183,7 @@ named!(get_bond<&str, (usize, usize, Bond)>, do_parse!(
             (n1, n2, bond)
         }
     )
-));
+)));
 
 
 #[test]
@@ -253,29 +246,25 @@ fn format_bond_order(bond: &Bond) -> &str {
 // bond:1 ends here
 
 // lattice
-// # Sample
-// @<TRIPOS>CRYSIN
-
-
-// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*lattice][lattice:1]]
-// Format
-// ------
+// # Format
 // @<TRIPOS>CRYSIN
 // cell cell cell cell cell cell space_grp setting
-named!(get_lattice_from<&str, Lattice>, do_parse!(
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*lattice][lattice:1]]
+named!(get_lattice_from<&str, Lattice>, sp!(do_parse!(
                 tag!("@<TRIPOS>CRYSIN") >>
                 read_until_eol          >>
-    a         : sp!(double)             >>
-    b         : sp!(double)             >>
-    c         : sp!(double)             >>
-    alpha     : sp!(double)             >>
-    beta      : sp!(double)             >>
-    gamma     : sp!(double)             >>
-    space_grp : sp!(unsigned_digit)     >>
-    setting   : sp!(unsigned_digit)     >>
-                read_line               >>
+    a         : double             >>
+    b         : double             >>
+    c         : double             >>
+    alpha     : double             >>
+    beta      : double             >>
+    gamma     : double             >>
+    space_grp : unsigned_digit     >>
+    setting   : unsigned_digit     >>
+                read_line          >>
     (Lattice::from_params(a, b, c, alpha, beta, gamma))
-));
+)));
 
 #[test]
 fn test_formats_mol2_crystal() {
@@ -304,7 +293,7 @@ named!(get_molecule_from<&str, Molecule>, do_parse!(
     counts      : sp!(counts_line)                             >>
     mol_type    : read_line                                    >>
     charge_type : read_line                                    >>
-    atoms       : get_atoms_from                               >>
+    atoms       : read_atoms                               >>
                   opt!(complete!(take_until!("@<TRIPOS>")))    >>
     bonds       : opt!(complete!(get_bonds_from))              >>
     lattice     : opt!(complete!(get_lattice_from))            >>

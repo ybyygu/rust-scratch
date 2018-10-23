@@ -51,7 +51,10 @@ fn test_cif_float_number() {
 
 /// Recognizes a float value with a preceeding tag
 fn tagged_f64<'a>(input: &'a str, tag: &'a str) -> IResult<&'a str, f64> {
-    preceded!(input, sp!(tag!(tag)), sp!(double_cif))
+    sp!(
+        input,
+        preceded!(tag!(tag), double_cif)
+    )
 }
 
 #[test]
@@ -60,14 +63,14 @@ fn test_tagged_f64() {
     assert_eq!(4.1, v);
 }
 
-named!(cell_params<&str, (f64, f64, f64, f64, f64, f64)>, permutation!(
-    ws!(call!(tagged_f64, "_cell_length_a")),
-    ws!(call!(tagged_f64, "_cell_length_b")),
-    ws!(call!(tagged_f64, "_cell_length_c")),
-    ws!(call!(tagged_f64, "_cell_angle_alpha")),
-    ws!(call!(tagged_f64, "_cell_angle_beta")),
-    ws!(call!(tagged_f64, "_cell_angle_gamma"))
-));
+named!(cell_params<&str, (f64, f64, f64, f64, f64, f64)>, ws!(permutation!(
+    call!(tagged_f64, "_cell_length_a"),
+    call!(tagged_f64, "_cell_length_b"),
+    call!(tagged_f64, "_cell_length_c"),
+    call!(tagged_f64, "_cell_angle_alpha"),
+    call!(tagged_f64, "_cell_angle_beta"),
+    call!(tagged_f64, "_cell_angle_gamma")
+)));
 
 
 /// Read crystal cell
@@ -271,10 +274,10 @@ named!(geom_bond_header<&str, &str>, preceded!(
     not_space
 ));
 
-named!(geom_bond_headers<&str, Vec<&str>>, preceded!(
-    ws!(tag!("loop_")),
-    many1!(ws!(geom_bond_header))
-));
+named!(geom_bond_headers<&str, Vec<&str>>, ws!(preceded!(
+    tag!("loop_"),
+    many1!(geom_bond_header)
+)));
 
 #[test]
 fn test_cif_bond_header() {
@@ -297,17 +300,17 @@ _ccdc_geom_bond_type
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*molecule][molecule:1]]
 // The first line
 named!(cif_title<&str, &str>, preceded!(
-    sp!(tag!("data_")),
+    tag!("data_"),
     not_space
 ));
 
 /// Create Molecule object from cif stream
-named!(read_molecule<&str, Molecule>, do_parse!(
-    name : cif_title              >>
-           take_until!("\n_cell") >>
-    lat  : ws!(read_cell)         >>
-           take_until!("\n_atom") >>
-    atoms: ws!(read_atoms)        >>
+named!(read_molecule<&str, Molecule>, nl!(do_parse!(
+    name : cif_title            >>
+           take_until!("_cell") >>
+    lat  : read_cell            >>
+           take_until!("_atom") >>
+    atoms: read_atoms           >>
     (
         {
             // TODO: add bonds
@@ -324,7 +327,7 @@ named!(read_molecule<&str, Molecule>, do_parse!(
             mol
         }
     )
-));
+)));
 
 #[test]
 fn test_cif_molecule() {

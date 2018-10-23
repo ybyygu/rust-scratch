@@ -1,12 +1,12 @@
 // header
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*header][header:1]]
-// gchemol parses the following record types in a PDB file:
+// parses the following record types in a PDB file:
 //
 // CRYST
-// ATOM & HETATM
+// ATOM or HETATM
 // TER
-// END
+// END or ENDMDL
 // CONECT
 // header:1 ends here
 
@@ -261,11 +261,11 @@ HETATM 1641  C8  MID E   5      -2.096   3.018  29.071  1.00 30.82           C\n
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*bond%20records][bond records:1]]
 use gchemol::Bond;
 
-named!(read_bond_record<&str, Vec<(usize, usize)>>, do_parse!(
-             tag!("CONECT")                       >>
-    current: sp!(unsigned_digit)                  >>
-    others : many1!(sp!(unsigned_digit))          >>
-             sp!(line_ending)                     >>
+named!(read_bond_record<&str, Vec<(usize, usize)>>, sp!(do_parse!(
+             tag!("CONECT")                  >>
+    current: unsigned_digit                  >>
+    others : many1!(unsigned_digit)          >>
+             line_ending                     >>
     (
         {
             let mut pairs = vec![];
@@ -276,7 +276,7 @@ named!(read_bond_record<&str, Vec<(usize, usize)>>, do_parse!(
             pairs
         }
     )
-));
+)));
 
 fn format_bonds(mol: &Molecule) -> String {
     let mut lines = String::new();
