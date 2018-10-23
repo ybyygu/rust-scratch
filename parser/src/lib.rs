@@ -16,6 +16,7 @@
 #[macro_use]
 mod nom_parser;
 mod parser;
+mod mol2;
 mod pdb;
 mod cif;
 
