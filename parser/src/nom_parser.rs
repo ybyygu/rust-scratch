@@ -243,6 +243,14 @@ C -11.4286 -1.3155  0.0000
     let (_, lines) = read_many_lines(txt, 3).expect("read_many_lines");
     assert_eq!(3, lines.len());
 }
+
+/// Read lines until the line starting with the `label`. This will return the consumed lines
+#[inline]
+pub fn read_lines_until<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str, Vec<&'a str>> {
+    let (input, pp) = many_till!(input, read_line, peek!(tag!(input)))?;
+
+    Ok((input, pp.0))
+}
 // lines:1 ends here
 
 // atom/atoms

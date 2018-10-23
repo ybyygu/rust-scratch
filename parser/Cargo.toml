@@ -15,4 +15,7 @@ nom = "4.1"
 #serde-pickle = "*"
 #gchemol = { git = "https://github.com/ybyygu/gchemol.git" }
 gchemol = {path = "/home/ybyygu/Workspace/Programming/gchemol" }
+
+[dev-dependencies]
+approx = "0.3"
 # cargo:1 ends here
