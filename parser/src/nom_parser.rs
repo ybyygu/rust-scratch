@@ -37,6 +37,18 @@ macro_rules! nl (
     )
 );
 
+/// A DOS `\r` char consumer
+named!(pub dos_eol_pre_token<&str, &str>, eat_separator!(&b"\r\n"[..]));
+
+#[macro_export]
+macro_rules! to_unix (
+    ($i:expr, $($args:tt)*) => (
+        {
+            sep!($i, dos_eol_pre_token, $($args)*)
+        }
+    )
+);
+
 #[test]
 fn test_parser_sp() {
     // will consume space between each token.

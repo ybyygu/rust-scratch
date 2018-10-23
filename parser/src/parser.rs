@@ -317,16 +317,17 @@ pub fn read_section<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str,
     if sect.is_array {
         use nom::{Err::Failure, ErrorKind};
 
-        let array_size: usize = sect.value.trim().parse().map_err(
-            |e| {
-                eprintln!("failed to parse array size{:?}", e);
+        let (_, array_size) = parse_to!(sect.value.trim(), usize)?;
+        // let array_size: usize = sect.value.trim().parse().map_err(
+        //     |e| {
+        //         eprintln!("failed to parse array size{:?}", e);
 
-                let blah = sect.value;
-                Failure(error_node_position!(blah,
-                                             ErrorKind::Custom(42),
-                                             error_position!(blah, ErrorKind::ParseTo)))
-            }
-        )?;
+        //         let blah = sect.value;
+        //         Failure(error_node_position!(blah,
+        //                                      ErrorKind::Custom(42),
+        //                                      error_position!(blah, ErrorKind::ParseTo)))
+        //     }
+        // )?;
         // let (_, array_size) = add_return_error!(sect.value, nom::ErrorKind::Custom(42), unsigned_digit)?;
         let (input, array) = read_data_array(input, array_size, width)?;
         sect.data_array = Some(array);
