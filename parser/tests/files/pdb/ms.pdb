@@ -1,5 +1,4 @@
 REMARK   Materials Studio PDB file
-REMARK   Created:  Mon Oct 22 04:35:29 中国标准时间 2018
 ATOM      1  N   MOL C   1       1.386  -0.292   0.014  1.00  0.00           N1-  
 ATOM      2  N   MOL C   1      -1.386   0.292   0.007  1.00  0.00           N1-  
 ATOM      3  C   MOL C   1       0.919   0.971  -0.019  1.00  0.00           C    

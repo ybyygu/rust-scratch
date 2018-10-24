@@ -228,6 +228,12 @@ named!(pub read_until_eol<&str, &str>, terminated!(
     line_ending
 ));
 
+/// Peek current line without consuming it
+named!(pub peek_line<&str, &str>, peek!(terminated!(
+    not_line_ending,
+    line_ending
+)));
+
 // /// # Note
 // /// Use `sp!` macro to remove the remaining `\r` char in DOS format
 // named!(pub read_line<&str, &str>, take_until_and_consume!("\n"));
