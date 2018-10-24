@@ -7,21 +7,16 @@
 #![allow(dead_code)]
 
 #[macro_use] extern crate nom;
-#[macro_use] extern crate quicli;
 
 // for tests only
-#[cfg(test)]
-#[macro_use] extern crate approx;
+//#[cfg(test)]
+//#[macro_use] extern crate approx;
 
 #[macro_use]
 mod nom_parser;
 mod parser;
-mod mol2;
-mod pdb;
-mod vasp;
-mod cif;
-mod sdf;
 
+pub mod formats;
 pub use self::nom_parser::*;
 pub use self::parser::*;
 // lib.rs:1 ends here

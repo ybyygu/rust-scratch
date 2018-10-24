@@ -1,9 +1,6 @@
 // base
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*base][base:1]]
-// for logging
-use quicli::prelude::*;
-
 // Indicating the end of stream
 pub const MAGIC_EOF: &str = "\n\nxTHIS_IS_THE=MAGIC_END_OF_FILE\n";
 // base:1 ends here
@@ -217,7 +214,7 @@ named!(pub read_f64_many<&str, Vec<f64>>, sp!(
 #[test]
 fn test_parser_f64_many() {
     let line = "1.2  3.4 -5.7 0.2 \n";
-    let (r, fs) = read_f64_many(line).expect("f64 parser");
+    let (_, fs) = read_f64_many(line).expect("f64 parser");
     assert_eq!(4, fs.len());
 }
 // numbers:1 ends here
@@ -251,10 +248,8 @@ pub fn read_line(input: &str) -> nom::IResult<&str, &str> {
 
 #[test]
 fn test_parser_read_until_eol() {
-    let x = read_until_eol("this is the end\nok\n")
-        .expect("parser: read_until_eol");
-    let x = read_until_eol("\n")
-        .expect("parser: read_until_eol empty line");
+    let _ = read_until_eol("this is the end\nok\n").expect("parser: read_until_eol");
+    let _ = read_until_eol("\n").expect("parser: read_until_eol empty line");
 
     let (rest, line) = read_line("this is the end\r\nok\r\n")
         .expect("parser: read_until_eol");
@@ -289,7 +284,7 @@ C -11.4286 -1.3155  0.0000
 /// Read lines until the line starting with the `label`. This will return the consumed lines
 #[inline]
 pub fn read_lines_until<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str, Vec<&'a str>> {
-    let (input, pp) = many_till!(input, read_line, peek!(tag!(input)))?;
+    let (input, pp) = many_till!(input, read_line, peek!(tag!(label)))?;
 
     Ok((input, pp.0))
 }

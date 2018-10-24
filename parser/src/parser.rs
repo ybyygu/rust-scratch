@@ -3,13 +3,15 @@
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*base][base:1]]
 use crate::nom_parser::*;
 
-use std::fs::File;
 use std::io::{Read, BufRead, BufReader};
-use std::path::{Path};
 
 use quicli::prelude::*;
 use nom;
+// base:1 ends here
 
+// parse
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*parse][parse:1]]
 /// A stream parser for large text file
 pub struct TextParser {
     /// The buffer size counted in number of lines
@@ -122,4 +124,4 @@ impl TextParser {
         Ok(())
     }
 }
-// base:1 ends here
+// parse:1 ends here
