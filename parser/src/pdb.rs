@@ -458,7 +458,8 @@ fn format_molecule(mol: &Molecule) -> String {
 
 #[test]
 fn test_pdb_molecule() {
-    let lines = "SCALE3      0.000000  0.000000  0.132153        0.00000
+    let lines = "\
+SCALE3      0.000000  0.000000  0.132153        0.00000
 ATOM      1  O2  MOL     2      -4.808   4.768   2.469  1.00  0.00           O
 ATOM      2  O3  MOL     2      -6.684   6.549   1.983  1.00  0.00           O
 ATOM      3 T1   MOL     2      -5.234   6.009   1.536  1.00  0.00          Si1+
@@ -481,7 +482,8 @@ END\n\n";
     assert_eq!(13, v.natoms());
     assert_eq!(2, v.nbonds());
 
-    let lines = "REMARK   Created:  2018-10-22T12:36:28Z
+    let lines = "\
+REMARK   Created:  2018-10-22T12:36:28Z
 SCALE3      0.000000  0.000000  0.132153        0.00000
 ATOM      1  O2  MOL     2      -4.808   4.768   2.469  1.00  0.00           O
 ATOM      2  O3  MOL     2      -6.684   6.549   1.983  1.00  0.00           O

@@ -180,12 +180,15 @@ named!(get_bonds_from<&str, Vec<(usize, usize, Bond)>>, do_parse!(
 
 #[test]
 fn test_mol2_bonds() {
-    let lines = "@<TRIPOS>BOND
+    let lines = "\
+@<TRIPOS>BOND
      1    13    11    1
      2    11    12    1
      3     8     4    1
      4     7     3    1
-     5     4     3   ar \n\n";
+     5     4     3   ar
+
+";
 
     let (_, x) = get_bonds_from(lines)
         .expect("mol2 bonds");

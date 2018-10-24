@@ -18,7 +18,9 @@ mod nom_parser;
 mod parser;
 mod mol2;
 mod pdb;
+mod vasp;
 mod cif;
+mod sdf;
 
 pub use self::nom_parser::*;
 pub use self::parser::*;
