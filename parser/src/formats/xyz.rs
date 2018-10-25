@@ -162,12 +162,14 @@ impl ChemFileLike for XYZFile {
 #[test]
 fn test_formats_xyz() {
     let file = XYZFile();
-    let mols = file.parse("tests/files/xyz/c2h4.xyz").expect("c2h4 xyz");
+    let path = Path::new("tests/files/xyz/c2h4.xyz");
+    let mols = file.parse(path).expect("c2h4 xyz");
     assert_eq!(1, mols.len());
     assert_eq!(6, mols[0].natoms());
 
     // parse multiple molecules
-    let mols = file.parse("tests/files/xyz/multi.xyz").expect("multi xyz");
+    let path = Path::new("tests/files/xyz/multi.xyz");
+    let mols = file.parse(path).expect("multi xyz");
     assert_eq!(6, mols.len());
 
     let natoms_expected = vec![16, 10, 16, 16, 16, 13];
@@ -223,7 +225,7 @@ impl ChemFileLike for PlainXYZFile {
 
 #[test]
 fn test_formats_plain_xyz() {
-    let filename = "tests/files/xyz/c2h4.pxyz";
+    let filename = Path::new("tests/files/xyz/c2h4.pxyz");
     let file = PlainXYZFile();
     assert!(file.parsable(filename));
     let mols = file.parse(filename).unwrap();
@@ -231,7 +233,7 @@ fn test_formats_plain_xyz() {
     assert_eq!(6, mols[0].natoms());
 
     // element numbers
-    let filename = "tests/files/xyz/ele-num.pxyz";
+    let filename = Path::new("tests/files/xyz/ele-num.pxyz");
     let mols = file.parse(filename).expect("ele-num.pyxz");
     assert_eq!(1, mols.len());
     assert_eq!(17, mols[0].natoms());
@@ -239,7 +241,7 @@ fn test_formats_plain_xyz() {
     assert_eq!("Si", symbols[0]);
 
     // parse multiple molecules
-    let mols = file.parse("tests/files/xyz/multi.pxyz").expect("multi xyz");
+    let mols = file.parse(Path::new("tests/files/xyz/multi.pxyz")).expect("multi xyz");
     assert_eq!(6, mols.len());
 
     let natoms_expected = vec![16, 10, 16, 16, 16, 13];

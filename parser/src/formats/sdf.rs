@@ -227,14 +227,14 @@ fn test_formats_sdf() {
         "tests/files/sdf/multi-babel.mol",
     ];
     for fname in fnames {
-        let mols = file.parse(fname).expect("sd file");
+        let mols = file.parse(Path::new(fname)).expect("sd file");
         assert_eq!(mols.len(), 2);
         assert_eq!(mols[0].natoms(), 30);
         assert_eq!(mols[0].nbonds(), 31);
     }
 
     let fname = "tests/files/sdf/thiadiazolyl.mol";
-    let mols = file.parse(fname).expect("mol file");
+    let mols = file.parse(Path::new(fname)).expect("mol file");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 7);
     assert_eq!(mols[0].nbonds(), 7);

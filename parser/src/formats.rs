@@ -19,11 +19,11 @@ mod pdb;
 mod mol2;
 mod sdf;
 mod cif;
+mod vasp;
 // mods:1 ends here
 
 // traits
 // Unify behaviors for all chemical file formats
-
 
 // [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*traits][traits:1]]
 pub trait ChemFileLike {
@@ -35,7 +35,8 @@ pub trait ChemFileLike {
     fn extensions(&self) -> Vec<&str>;
 
     /// Determine if file `filename` is parable according to its supported file extensions
-    fn parsable(&self, filename: &str) -> bool {
+    fn parsable(&self, filename: &Path) -> bool {
+        let filename = format!("{}", filename.display());
         let filename = filename.to_lowercase();
         for s in self.extensions() {
             if filename.ends_with(&s.to_lowercase()) {
@@ -88,8 +89,8 @@ pub trait ChemFileLike {
     }
 
     /// Default implementation: parse multiple molecules from `filename`
-    fn parse<P: AsRef<Path>>(&self, path: P) -> Result<Vec<Molecule>> {
-        let path = path.as_ref();
+    // Note: cannot use generic type parameters
+    fn parse(&self, path: &Path) -> Result<Vec<Molecule>> {
         let fp = File::open(path)
             .map_err(|e| format_err!("failed to open {}: {:?}", path.display(), e))?;
 
@@ -112,3 +113,55 @@ pub trait ChemFileLike {
     }
 }
 // traits:1 ends here
+
+// backends
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*backends][backends:1]]
+macro_rules! avail_parsers {
+    () => {
+        vec![
+            Box::new(xyz::XYZFile()),
+            Box::new(xyz::PlainXYZFile()),
+            Box::new(mol2::Mol2File()),
+            Box::new(sdf::SdfFile()),
+            Box::new(vasp::PoscarFile()),
+            Box::new(cif::CifFile()),
+            Box::new(pdb::PdbFile()),
+        ]
+    };
+}
+
+/// guess the most appropriate file format by its file extensions
+pub fn guess_chemfile<P: AsRef<Path>>(path: P, fmt: Option<&str>) -> Option<Box<ChemFileLike>>{
+    let filename = path.as_ref();
+
+    let backends: Vec<Box<ChemFileLike>> = avail_parsers!();
+    // 1. by file type
+    if let Some(fmt) = fmt {
+        for x in backends {
+            if x.ftype() == fmt.to_lowercase() {
+                return Some(x);
+            }
+        }
+    // 2. or by file extension
+    } else {
+        for x in backends {
+            if x.parsable(filename) {
+                return Some(x);
+            }
+        }
+    }
+
+    // 3. return None if no suitable backend
+    None
+}
+
+/// description of all backends
+pub fn describe_backends() {
+    let backends: Vec<Box<ChemFileLike>> = avail_parsers!();
+
+    for cf in backends {
+        cf.describe();
+    }
+}
+// backends:1 ends here

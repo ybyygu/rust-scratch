@@ -119,9 +119,9 @@ named!(poscar_position<&str, ([f64; 3], Option<[bool; 3]>)>, sp!(do_parse!(
 fn test_poscar_position() {
     let line = "     0.05185     0.39121     0.29921  T T T # O \n";
     let (_, (position, sflags)) = poscar_position(line).expect("POSCAR position style 1");
-    assert_relative_eq!(0.05185, position[0]);
-    assert_relative_eq!(0.39121, position[1]);
-    assert_relative_eq!(0.29921, position[2]);
+    assert_eq!(0.05185, position[0]);
+    assert_eq!(0.39121, position[1]);
+    assert_eq!(0.29921, position[2]);
     assert_eq!(Some([true, true, true]), sflags);
 
     let line = "     0.05185     0.39121     0.29921\n";
@@ -323,3 +323,35 @@ fn test_poscar_symbols_counts() {
     assert_eq!([("C", 1)].to_vec(), x);
 }
 // format molecule:1 ends here
+
+// chemfile
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*chemfile][chemfile:1]]
+pub struct PoscarFile();
+
+impl ChemFileLike for PoscarFile {
+    fn ftype(&self) -> &str {
+        "vasp/poscar"
+    }
+
+    fn extensions(&self) -> Vec<&str> {
+        vec!["POSCAR", "CONTCAR", ".poscar", ".vasp"]
+    }
+
+    fn parse_molecule<'a>(&self, chunk: &'a str) -> IResult<&'a str, Molecule> {
+        get_molecule_from(chunk)
+    }
+
+    fn format_molecule(&self, mol: &Molecule) -> Result<String> {
+        Ok(format_molecule(mol))
+    }
+}
+
+#[test]
+fn test_vasp_poscar_parse() {
+    let poscar = PoscarFile();
+    let mols = poscar.parse(Path::new("tests/files/vasp/POSCAR")).unwrap();
+    assert_eq!(1, mols.len());
+    assert_eq!(365, mols[0].natoms());
+}
+// chemfile:1 ends here

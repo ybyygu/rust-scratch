@@ -452,27 +452,27 @@ impl ChemFileLike for CifFile {
 fn test_formats_cif() {
     let file = CifFile();
     let fname = "tests/files/cif/babel.cif";
-    let mols = file.parse(fname).expect("babel.cif");
+    let mols = file.parse(Path::new(fname)).expect("babel.cif");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 34);
 
     let fname = "tests/files/cif/MS-MOR.cif";
-    let mols = file.parse(fname).expect("MS-MOR.cif");
+    let mols = file.parse(Path::new(fname)).expect("MS-MOR.cif");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 144);
 
     let fname = "tests/files/cif/IZA-LTL.cif";
-    let mols = file.parse(fname).expect("cif IZA");
+    let mols = file.parse(Path::new(fname)).expect("cif IZA");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 8);
 
     let fname = "tests/files/cif/ccdc.cif";
-    let mols = file.parse(fname).expect("cif ccdc");
+    let mols = file.parse(Path::new(fname)).expect("cif ccdc");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 41);
 
     let fname = "tests/files/cif/quinone.cif";
-    let mols = file.parse(fname).expect("cif quinone");
+    let mols = file.parse(Path::new(fname)).expect("cif quinone");
     assert_eq!(mols.len(), 1);
     assert_eq!(mols[0].natoms(), 16);
 }

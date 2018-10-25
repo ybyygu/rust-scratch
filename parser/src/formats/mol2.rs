@@ -455,7 +455,7 @@ fn test_formats_mol2() {
 
     // when missing final blank line
     // gaussview generated .mol2 file
-    let mols = file.parse("tests/files/mol2/alanine-gv.mol2").expect("gv generated mol2 file");
+    let mols = file.parse(Path::new("tests/files/mol2/alanine-gv.mol2")).expect("gv generated mol2 file");
     assert_eq!(1, mols.len());
     let mol = &mols[0];
     assert_eq!(12, mol.natoms());
@@ -463,7 +463,7 @@ fn test_formats_mol2() {
 
     // molecule trajectory
     // openbabel converted .mol2 file
-    let mols = file.parse("tests/files/mol2/multi-obabel.mol2").expect("mol2 multi");
+    let mols = file.parse(Path::new("tests/files/mol2/multi-obabel.mol2")).expect("mol2 multi");
 
     let natoms_expected = vec![16, 10, 16, 16, 16, 13];
     let natoms: Vec<_> = mols.iter().map(|m| m.natoms()).collect();
@@ -476,7 +476,7 @@ fn test_formats_mol2() {
 
     // single molecule with a lattice
     // discovery studio generated .mol2 file
-    let mols = file.parse("tests/files/mol2/LTL-crysin-ds.mol2").expect("mol2 crysin");
+    let mols = file.parse(Path::new("tests/files/mol2/LTL-crysin-ds.mol2")).expect("mol2 crysin");
     assert_eq!(1, mols.len());
     assert!(mols[0].lattice.is_some());
 }
