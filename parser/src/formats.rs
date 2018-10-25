@@ -17,6 +17,8 @@ use gchemol::{Atom, Bond, Molecule, Lattice, BondKind};
 mod xyz;
 mod pdb;
 mod mol2;
+mod sdf;
+mod cif;
 // mods:1 ends here
 
 // traits
