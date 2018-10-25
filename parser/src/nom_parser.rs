@@ -5,9 +5,9 @@
 pub const MAGIC_EOF: &str = "\n\nxTHIS_IS_THE=MAGIC_END_OF_FILE\n";
 // base:1 ends here
 
-// macros
+// separator
 
-// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*macros][macros:1]]
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*separator][separator:1]]
 named!(pub eof<&str, &str>, tag!(MAGIC_EOF));
 
 /// A whitespace wrapper consuming " \t\r" (no newline)
@@ -69,7 +69,34 @@ fn test_parser_sp() {
                      )
     ).expect("parser sp test2");
 }
-// macros:1 ends here
+// separator:1 ends here
+
+// error
+// two use cases:
+// : return Err(nom_error!(input));
+// : map_err(|e| nom_failure!(input))
+
+// [[file:~/Workspace/Programming/rust-scratch/parser/parser.note::*error][error:1]]
+#[macro_export]
+macro_rules! nom_error {
+    ($e:expr) => {
+        nom::Err::Error(error_position!($e, nom::ErrorKind::Custom(28)))
+    };
+    ($e:expr, $c:expr) => {
+        nom::Err::Error(error_position!($e, nom::ErrorKind::Custom($c)))
+    };
+}
+
+#[macro_export]
+macro_rules! nom_failure {
+    ($e:expr) => {
+        nom::Err::Failure(error_position!($e, nom::ErrorKind::Custom(38)))
+    };
+    ($e:expr, $c:expr) => {
+        nom::Err::Failure(error_position!($e, nom::ErrorKind::Custom($c)))
+    };
+}
+// error:1 ends here
 
 // reexport
 // reexport nom combinators
@@ -287,10 +314,68 @@ C -11.4286 -1.3155  0.0000
     assert_eq!(3, lines.len());
 }
 
-/// Read lines until the line starting with the `label`. This will return the consumed lines
+/// Read lines until the line starting with the `label`, and return the consumed lines
 #[inline]
 pub fn read_lines_until<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str, Vec<&'a str>> {
-    let (input, pp) = many_till!(input, read_line, peek!(tag!(label)))?;
+    let (input, pp) = dos2unix!(
+        input,
+        many_till!(
+            read_line,
+            peek!(
+                alt!(tag!(label) | eof)
+            )
+        )
+    )?;
+
+    Ok((input, pp.0))
+}
+
+/// Read lines until the line starting with the `label` and consumes it
+#[inline]
+pub fn read_lines_until_and_consume<'a>(input: &'a str, label: &'a str) -> nom::IResult<&'a str, Vec<&'a str>> {
+    let (input, pp) = dos2unix!(input,
+        many_till!(
+            read_line,
+            alt!(tag!(label) | eof)
+        )
+    )?;
+
+    Ok((input, pp.0))
+}
+
+/// Read lines until the parser applies
+#[inline]
+pub fn read_many_until<'a, F>(input: &'a str, parser: F) -> nom::IResult<&'a str, Vec<&'a str>>
+where
+    F: Fn(&'a str) -> nom::IResult<&'a str, &'a str>,
+{
+    let (input, pp) = many_till!(
+        input,
+        read_line,
+        peek!(
+            alt!(
+                parser |
+                eof
+            )
+        )
+    )?;
+
+    Ok((input, pp.0))
+}
+
+#[inline]
+pub fn read_many_until_and_consume<'a, F>(input: &'a str, parser: F) -> nom::IResult<&'a str, Vec<&'a str>>
+where
+    F: Fn(&'a str) -> nom::IResult<&'a str, &'a str>,
+{
+    let (input, pp) = many_till!(
+        input,
+        read_line,
+        alt!(
+            parser |
+            eof
+        )
+    )?;
 
     Ok((input, pp.0))
 }
