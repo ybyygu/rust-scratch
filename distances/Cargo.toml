@@ -1,0 +1,14 @@
+# cargo
+
+# [[file:~/Workspace/Programming/rust-scratch/distances/distances.note::*cargo][cargo:1]]
+[package]
+name = "distances"
+version = "0.0.1"
+edition = "2018"
+authors = ["Wenping Guo <ybyygu@gmail.com>"]
+
+[dependencies]
+structopt = "*"
+quicli = "*"
+rayon = "1.0"
+# cargo:1 ends here
